@@ -1459,6 +1459,13 @@ rai::process_return rai::node::process_receive_one (MDB_txn * transaction_a, std
             }
 			store.unchecked_put (transaction_a, block_a->source (), block_a);
 			gap_cache.add (transaction_a, block_a);
+			// workaround for open blocks
+			auto block_o (static_cast <rai::open_block *> (block_a.get ()));
+			rai::account account_o (block_o->hashables.account);
+			if (account_o != 0)
+			{
+				store.unchecked_put (transaction_a, account_o, block_a);
+			}
             break;
         }
         case rai::process_result::old:

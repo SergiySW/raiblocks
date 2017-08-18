@@ -302,8 +302,13 @@ void rai::frontier_req_client::receive_frontier ()
 
 void rai::frontier_req_client::request_account (rai::account const & account_a, rai::block_hash const & latest_a)
 {
-    // Account they know about and we don't.
-    connection->attempt->pulls.push_back (rai::pull_info (account_a, latest_a, rai::block_hash (0)));
+	// Account they know about and we don't.
+	rai::transaction transaction (connection->node->store.environment, nullptr, false);
+	rai::block_hash head_a (connection->node->store.unchecked_head (transaction, rai::block_hash (0), account_a)); // check unsynched head
+	if (latest_a != head_a)
+	{
+		connection->attempt->pulls.push_back (rai::pull_info (account_a, latest_a, head_a));
+	}
 }
 
 void rai::frontier_req_client::unsynced (MDB_txn * transaction_a, rai::block_hash const & ours_a, rai::block_hash const & theirs_a)
@@ -354,7 +359,8 @@ void rai::frontier_req_client::received_frontier (boost::system::error_code cons
                 if (account == current)
                 {
 					rai::transaction transaction (connection->node->store.environment, nullptr, true);
-                    if (latest == info.head)
+					rai::block_hash head_a (connection->node->store.unchecked_head (transaction, info.head, account)); // check unsynched head
+                    if (latest == head_a)
                     {
                         // In sync
                     }
@@ -375,11 +381,11 @@ void rai::frontier_req_client::received_frontier (boost::system::error_code cons
 							rai::account faucet ("8E319CE6F3025E5B2DF66DA7AB1467FE48F1679C13DD43BFDB29FA2E9FC40D3B");
 							if (account != rai::genesis_account && account != landing && account != faucet)
 							{
-								connection->attempt->pulls.push_back (rai::pull_info (account, latest, info.head));
+								connection->attempt->pulls.push_back (rai::pull_info (account, latest, head_a));
 							}
 							else
 							{
-								connection->attempt->pulls.push_front (rai::pull_info (account, latest, info.head));
+								connection->attempt->pulls.push_front (rai::pull_info (account, latest, head_a));
 							}
 						}
 					}

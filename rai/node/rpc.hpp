@@ -155,6 +155,7 @@ public:
 	void unchecked ();
 	void unchecked_clear ();
 	void unchecked_get ();
+	void unchecked_head ();
 	void unchecked_keys ();
 	void validate_account_number ();
 	void version ();

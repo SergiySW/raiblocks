@@ -2278,6 +2278,35 @@ void rai::rpc_handler::unchecked_get ()
 	}
 }
 
+void rai::rpc_handler::unchecked_head ()
+{
+	std::string hash_text (request.get <std::string> ("hash"));
+	rai::uint256_union hash;
+	auto error (hash.decode_hex (hash_text));
+	if (!error)
+	{
+		std::string account_text (request.get <std::string> ("account"));
+		rai::account account;
+		auto error (account.decode_account (account_text));
+		if (!error)
+		{
+			rai::transaction transaction (node.store.environment, nullptr, false);
+			rai::uint256_union head (node.store.unchecked_head (transaction, hash, account));
+			boost::property_tree::ptree response_l;
+			response_l.put ("head", head.to_string ());
+			response (response_l);
+		}
+		else
+		{
+			error_response (response, "Bad account number");
+		}
+	}
+	else
+	{
+		error_response (response, "Bad hash number");
+	}
+}
+
 void rai::rpc_handler::unchecked_keys ()
 {
 	uint64_t count (std::numeric_limits <uint64_t>::max ());
@@ -3572,6 +3601,10 @@ void rai::rpc_handler::process_request ()
 		else if (action == "unchecked_get")
 		{
 			unchecked_get ();
+		}
+		else if (action == "unchecked_head")
+		{
+			unchecked_head ();
 		}
 		else if (action == "unchecked_keys")
 		{
