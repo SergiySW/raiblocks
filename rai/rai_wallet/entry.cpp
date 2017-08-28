@@ -272,7 +272,18 @@ int run_wallet (QApplication & application, int argc, char * const * argv, boost
 			}
 			else
 			{
-				show_error ("Error initializing node");
+				if (init.block_store_init)
+				{
+					show_error ("Error initializing block store");
+				}
+				else if (init.wallet_init)
+				{
+					show_error ("Error initializing wallet");
+				}
+				else
+				{
+					show_error ("Error initializing node");
+				}
 			}
 		});
 		result = application.exec ();
