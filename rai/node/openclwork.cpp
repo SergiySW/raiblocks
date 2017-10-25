@@ -715,6 +715,7 @@ boost::optional <uint64_t> rai::opencl_work::generate_work (rai::work_pool & poo
 	size_t work_size [] = { thread_count, 0, 0 };
 	while (pool_a.work_validate (root_a, result) && !error)
 	{
+		auto begin1 (std::chrono::high_resolution_clock::now ());
 		result = rand.next ();
 		cl_int write_error1 = clEnqueueWriteBuffer (queue, attempt_buffer, false, 0, sizeof (uint64_t), &result, 0, nullptr, nullptr);
 		if (write_error1 == CL_SUCCESS)
@@ -731,6 +732,8 @@ boost::optional <uint64_t> rai::opencl_work::generate_work (rai::work_pool & poo
 						cl_int finishError = clFinish (queue);
 						if (finishError == CL_SUCCESS)
 						{
+							auto end1 (std::chrono::high_resolution_clock::now ());
+							std::cerr << boost::str (boost::format ("%|1$ 12d|\n") % std::chrono::duration_cast <std::chrono::microseconds> (end1 - begin1).count ());
 						}
 						else
 						{
