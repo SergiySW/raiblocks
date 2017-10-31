@@ -558,10 +558,10 @@ void rai::uint256_union::encode_account (std::string & destination_a) const
     assert (destination_a.empty ());
     destination_a.reserve (64);
     uint64_t check (0);
-    blake2b_state hash;
-	blake2b_init (&hash, 5);
-    blake2b_update (&hash, bytes.data (), bytes.size ());
-    blake2b_final (&hash, reinterpret_cast <uint8_t *> (&check), 5);
+    blake2_state hash;
+	blake2_init (&hash, 5);
+    blake2_update (&hash, bytes.data (), bytes.size ());
+    blake2_final (&hash, reinterpret_cast <uint8_t *> (&check), 5);
     rai::uint512_t number_l (number ());
 	number_l <<= 40;
     number_l |= rai::uint512_t (check);
@@ -619,10 +619,10 @@ bool rai::uint256_union::decode_account_v1 (std::string const & source_a)
             if (!result)
             {
                 uint32_t validation;
-                blake2b_state hash;
-				blake2b_init (&hash, sizeof (validation));
-                blake2b_update (&hash, bytes.data (), sizeof (bytes));
-                blake2b_final (&hash, reinterpret_cast <uint8_t *> (&validation), sizeof (validation));
+                blake2_state hash;
+				blake2_init (&hash, sizeof (validation));
+                blake2_update (&hash, bytes.data (), sizeof (bytes));
+                blake2_final (&hash, reinterpret_cast <uint8_t *> (&validation), sizeof (validation));
                 result = check != validation;
             }
         }
@@ -659,10 +659,10 @@ bool rai::uint256_union::decode_account (std::string const & source_a)
 				uint64_t check (number_l.convert_to <uint64_t> ());
 				check &=  0xffffffffff;
 				uint64_t validation (0);
-				blake2b_state hash;
-				blake2b_init (&hash, 5);
-				blake2b_update (&hash, bytes.data (), bytes.size ());
-				blake2b_final (&hash, reinterpret_cast <uint8_t *> (&validation), 5);
+				blake2_state hash;
+				blake2_init (&hash, 5);
+				blake2_update (&hash, bytes.data (), bytes.size ());
+				blake2_final (&hash, reinterpret_cast <uint8_t *> (&validation), 5);
 				result = check != validation;
 			}
 		}
@@ -776,19 +776,19 @@ void ed25519_randombytes_unsafe (void * out, size_t outlen)
 }
 void ed25519_hash_init (ed25519_hash_context * ctx)
 {
-    ctx->blake2 = new blake2b_state;
-	blake2b_init (reinterpret_cast <blake2b_state *> (ctx->blake2), 64);
+    ctx->blake2 = new blake2_state;
+	blake2_init (reinterpret_cast <blake2_state *> (ctx->blake2), 64);
 }
 
 void ed25519_hash_update (ed25519_hash_context * ctx, uint8_t const * in, size_t inlen)
 {
-    blake2b_update (reinterpret_cast <blake2b_state *> (ctx->blake2), in, inlen);
+    blake2_update (reinterpret_cast <blake2_state *> (ctx->blake2), in, inlen);
 }
 
 void ed25519_hash_final (ed25519_hash_context * ctx, uint8_t * out)
 {
-    blake2b_final (reinterpret_cast <blake2b_state *> (ctx->blake2), out, 64);
-    delete reinterpret_cast <blake2b_state *> (ctx->blake2);
+    blake2_final (reinterpret_cast <blake2_state *> (ctx->blake2), out, 64);
+    delete reinterpret_cast <blake2_state *> (ctx->blake2);
 }
 
 void ed25519_hash (uint8_t * out, uint8_t const * in, size_t inlen)

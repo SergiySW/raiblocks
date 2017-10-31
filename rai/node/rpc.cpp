@@ -1038,11 +1038,11 @@ void rai::rpc_handler::deterministic_key ()
 		{
 			rai::uint256_union index (index_a);
 			rai::uint256_union prv;
-			blake2b_state hash;
-			blake2b_init (&hash, prv.bytes.size ());
-			blake2b_update (&hash, seed.data.bytes.data (), seed.data.bytes.size ());
-			blake2b_update (&hash, reinterpret_cast <uint8_t *> (&index.dwords [7]), sizeof (uint32_t));
-			blake2b_final (&hash, prv.bytes.data (), prv.bytes.size ());
+			blake2_state hash;
+			blake2_init (&hash, prv.bytes.size ());
+			blake2_update (&hash, seed.data.bytes.data (), seed.data.bytes.size ());
+			blake2_update (&hash, reinterpret_cast <uint8_t *> (&index.dwords [7]), sizeof (uint32_t));
+			blake2_final (&hash, prv.bytes.data (), prv.bytes.size ());
 			boost::property_tree::ptree response_l;
 			rai::uint256_union pub;
 			ed25519_publickey (prv.bytes.data (), pub.bytes.data ());

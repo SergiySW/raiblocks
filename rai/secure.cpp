@@ -225,7 +225,7 @@ void rai::send_block::visit (rai::block_visitor & visitor_a) const
 	visitor_a.send_block (*this);
 }
 
-void rai::send_block::hash (blake2b_state & hash_a) const
+void rai::send_block::hash (blake2_state & hash_a) const
 {
 	hashables.hash (hash_a);
 }
@@ -283,13 +283,13 @@ rai::send_hashables::send_hashables (bool & error_a, boost::property_tree::ptree
 	}
 }
 
-void rai::send_hashables::hash (blake2b_state & hash_a) const
+void rai::send_hashables::hash (blake2_state & hash_a) const
 {
-	auto status (blake2b_update (&hash_a, previous.bytes.data (), sizeof (previous.bytes)));
+	auto status (blake2_update (&hash_a, previous.bytes.data (), sizeof (previous.bytes)));
 	assert (status == 0);
-	status = blake2b_update (&hash_a, destination.bytes.data (), sizeof (destination.bytes));
+	status = blake2_update (&hash_a, destination.bytes.data (), sizeof (destination.bytes));
 	assert (status == 0);
-	status = blake2b_update (&hash_a, balance.bytes.data (), sizeof (balance.bytes));
+	status = blake2_update (&hash_a, balance.bytes.data (), sizeof (balance.bytes));
 	assert (status == 0);
 }
 
@@ -511,7 +511,7 @@ hashables (error_a, tree_a)
 	}
 }
 
-void rai::receive_block::hash (blake2b_state & hash_a) const
+void rai::receive_block::hash (blake2_state & hash_a) const
 {
 	hashables.hash (hash_a);
 }
@@ -595,20 +595,20 @@ rai::receive_hashables::receive_hashables (bool & error_a, boost::property_tree:
 	}
 }
 
-void rai::receive_hashables::hash (blake2b_state & hash_a) const
+void rai::receive_hashables::hash (blake2_state & hash_a) const
 {
-	blake2b_update (&hash_a, previous.bytes.data (), sizeof (previous.bytes));
-	blake2b_update (&hash_a, source.bytes.data (), sizeof (source.bytes));
+	blake2_update (&hash_a, previous.bytes.data (), sizeof (previous.bytes));
+	blake2_update (&hash_a, source.bytes.data (), sizeof (source.bytes));
 }
 
 rai::block_hash rai::block::hash () const
 {
     rai::uint256_union result;
-    blake2b_state hash_l;
-	auto status (blake2b_init (&hash_l, sizeof (result.bytes)));
+    blake2_state hash_l;
+	auto status (blake2_init (&hash_l, sizeof (result.bytes)));
 	assert (status == 0);
     hash (hash_l);
-    status = blake2b_final (&hash_l, result.bytes.data (), sizeof (result.bytes));
+    status = blake2_final (&hash_l, result.bytes.data (), sizeof (result.bytes));
 	assert (status == 0);
     return result;
 }
@@ -873,11 +873,11 @@ rai::open_hashables::open_hashables (bool & error_a, boost::property_tree::ptree
     }
 }
 
-void rai::open_hashables::hash (blake2b_state & hash_a) const
+void rai::open_hashables::hash (blake2_state & hash_a) const
 {
-    blake2b_update (&hash_a, source.bytes.data (), sizeof (source.bytes));
-    blake2b_update (&hash_a, representative.bytes.data (), sizeof (representative.bytes));
-    blake2b_update (&hash_a, account.bytes.data (), sizeof (account.bytes));
+    blake2_update (&hash_a, source.bytes.data (), sizeof (source.bytes));
+    blake2_update (&hash_a, representative.bytes.data (), sizeof (representative.bytes));
+    blake2_update (&hash_a, account.bytes.data (), sizeof (account.bytes));
 }
 
 rai::open_block::open_block (rai::block_hash const & source_a, rai::account const & representative_a, rai::account const & account_a, rai::raw_key const & prv_a, rai::public_key const & pub_a, uint64_t work_a) :
@@ -930,7 +930,7 @@ hashables (error_a, tree_a)
 	}
 }
 
-void rai::open_block::hash (blake2b_state & hash_a) const
+void rai::open_block::hash (blake2_state & hash_a) const
 {
     hashables.hash (hash_a);
 }
@@ -1108,10 +1108,10 @@ rai::change_hashables::change_hashables (bool & error_a, boost::property_tree::p
     }
 }
 
-void rai::change_hashables::hash (blake2b_state & hash_a) const
+void rai::change_hashables::hash (blake2_state & hash_a) const
 {
-    blake2b_update (&hash_a, previous.bytes.data (), sizeof (previous.bytes));
-    blake2b_update (&hash_a, representative.bytes.data (), sizeof (representative.bytes));
+    blake2_update (&hash_a, previous.bytes.data (), sizeof (previous.bytes));
+    blake2_update (&hash_a, representative.bytes.data (), sizeof (representative.bytes));
 }
 
 rai::change_block::change_block (rai::block_hash const & previous_a, rai::account const & representative_a, rai::raw_key const & prv_a, rai::public_key const & pub_a, uint64_t work_a) :
@@ -1156,7 +1156,7 @@ hashables (error_a, tree_a)
     }
 }
 
-void rai::change_block::hash (blake2b_state & hash_a) const
+void rai::change_block::hash (blake2_state & hash_a) const
 {
     hashables.hash (hash_a);
 }
@@ -3457,16 +3457,16 @@ rai::vote::vote (MDB_val const & value_a)
 rai::uint256_union rai::vote::hash () const
 {
     rai::uint256_union result;
-    blake2b_state hash;
-	blake2b_init (&hash, sizeof (result.bytes));
-    blake2b_update (&hash, block->hash ().bytes.data (), sizeof (result.bytes));
+    blake2_state hash;
+	blake2_init (&hash, sizeof (result.bytes));
+    blake2_update (&hash, block->hash ().bytes.data (), sizeof (result.bytes));
     union {
         uint64_t qword;
         std::array <uint8_t, 8> bytes;
     };
     qword = sequence;
-    blake2b_update (&hash, bytes.data (), sizeof (bytes));
-    blake2b_final (&hash, result.bytes.data (), sizeof (result.bytes));
+    blake2_update (&hash, bytes.data (), sizeof (bytes));
+    blake2_final (&hash, result.bytes.data (), sizeof (result.bytes));
     return result;
 }
 

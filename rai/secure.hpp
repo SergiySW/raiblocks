@@ -43,7 +43,7 @@ public:
 	// Return a digest of the hashables in this block.
 	rai::block_hash hash () const;
 	std::string to_json ();
-	virtual void hash (blake2b_state &) const = 0;
+	virtual void hash (blake2_state &) const = 0;
 	virtual uint64_t block_work () const = 0;
 	virtual void block_work_set (uint64_t) = 0;
 	// Previous block in account's chain, zero for open block
@@ -76,7 +76,7 @@ public:
 	send_hashables (rai::account const &, rai::block_hash const &, rai::amount const &);
 	send_hashables (bool &, rai::stream &);
 	send_hashables (bool &, boost::property_tree::ptree const &);
-	void hash (blake2b_state &) const;
+	void hash (blake2_state &) const;
 	rai::block_hash previous;
 	rai::account destination;
 	rai::amount balance;
@@ -88,7 +88,7 @@ public:
 	send_block (bool &, rai::stream &);
 	send_block (bool &, boost::property_tree::ptree const &);
 	using rai::block::hash;
-	void hash (blake2b_state &) const override;
+	void hash (blake2_state &) const override;
 	uint64_t block_work () const override;
 	void block_work_set (uint64_t) override;
 	rai::block_hash previous () const override;
@@ -114,7 +114,7 @@ public:
 	receive_hashables (rai::block_hash const &, rai::block_hash const &);
 	receive_hashables (bool &, rai::stream &);
 	receive_hashables (bool &, boost::property_tree::ptree const &);
-	void hash (blake2b_state &) const;
+	void hash (blake2_state &) const;
 	rai::block_hash previous;
 	rai::block_hash source;
 };
@@ -125,7 +125,7 @@ public:
 	receive_block (bool &, rai::stream &);
 	receive_block (bool &, boost::property_tree::ptree const &);
 	using rai::block::hash;
-	void hash (blake2b_state &) const override;
+	void hash (blake2_state &) const override;
 	uint64_t block_work () const override;
 	void block_work_set (uint64_t) override;
 	rai::block_hash previous () const override;
@@ -151,7 +151,7 @@ public:
 	open_hashables (rai::block_hash const &, rai::account const &, rai::account const &);
 	open_hashables (bool &, rai::stream &);
 	open_hashables (bool &, boost::property_tree::ptree const &);
-	void hash (blake2b_state &) const;
+	void hash (blake2_state &) const;
 	rai::block_hash source;
 	rai::account representative;
 	rai::account account;
@@ -164,7 +164,7 @@ public:
 	open_block (bool &, rai::stream &);
 	open_block (bool &, boost::property_tree::ptree const &);
 	using rai::block::hash;
-	void hash (blake2b_state &) const override;
+	void hash (blake2_state &) const override;
 	uint64_t block_work () const override;
 	void block_work_set (uint64_t) override;
 	rai::block_hash previous () const override;
@@ -190,7 +190,7 @@ public:
 	change_hashables (rai::block_hash const &, rai::account const &);
 	change_hashables (bool &, rai::stream &);
 	change_hashables (bool &, boost::property_tree::ptree const &);
-	void hash (blake2b_state &) const;
+	void hash (blake2_state &) const;
 	rai::block_hash previous;
 	rai::account representative;
 };
@@ -201,7 +201,7 @@ public:
 	change_block (bool &, rai::stream &);
 	change_block (bool &, boost::property_tree::ptree const &);
 	using rai::block::hash;
-	void hash (blake2b_state &) const override;
+	void hash (blake2_state &) const override;
 	uint64_t block_work () const override;
 	void block_work_set (uint64_t) override;
 	rai::block_hash previous () const override;

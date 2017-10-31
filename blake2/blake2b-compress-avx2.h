@@ -194,9 +194,9 @@ ALIGN(64) static const uint32_t indices[12][16] = {
         DECLARE_MESSAGE_WORDS(m)                                          \
         const __m256i iv0 = a;                                            \
         const __m256i iv1 = b;                                            \
-        __m256i       c   = LOAD(&blake2b_IV[0]);                         \
+        __m256i       c   = LOAD(&blake2_IV[0]);                         \
         __m256i       d =                                                 \
-            XOR(LOAD(&blake2b_IV[4]), _mm256_set_epi64x(f1, f0, t1, t0)); \
+            XOR(LOAD(&blake2_IV[4]), _mm256_set_epi64x(f1, f0, t1, t0)); \
         BLAKE2B_ROUNDS_V1(a, b, c, d, m);                                 \
         a = XOR(a, c);                                                    \
         b = XOR(b, d);                                                    \

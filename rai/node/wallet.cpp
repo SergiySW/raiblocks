@@ -42,11 +42,11 @@ rai::work_pool::~work_pool ()
 uint64_t rai::work_pool::work_value (rai::block_hash const & root_a, uint64_t work_a)
 {
 	uint64_t result;
-    blake2b_state hash;
-	blake2b_init (&hash, sizeof (result));
-    blake2b_update (&hash, reinterpret_cast <uint8_t *> (&work_a), sizeof (work_a));
-    blake2b_update (&hash, root_a.bytes.data (), root_a.bytes.size ());
-    blake2b_final (&hash, reinterpret_cast <uint8_t *> (&result), sizeof (result));
+    blake2_state hash;
+	blake2_init (&hash, sizeof (result));
+    blake2_update (&hash, reinterpret_cast <uint8_t *> (&work_a), sizeof (work_a));
+    blake2_update (&hash, root_a.bytes.data (), root_a.bytes.size ());
+    blake2_final (&hash, reinterpret_cast <uint8_t *> (&result), sizeof (result));
 	return result;
 }
 
@@ -57,8 +57,8 @@ void rai::work_pool::loop (uint64_t thread)
 	rai::random_pool.GenerateBlock (reinterpret_cast <uint8_t *> (rng.s.data ()),  rng.s.size () * sizeof (decltype (rng.s)::value_type));
 	uint64_t work;
 	uint64_t output;
-    blake2b_state hash;
-	blake2b_init (&hash, sizeof (output));
+    blake2_state hash;
+	blake2_init (&hash, sizeof (output));
 	std::unique_lock <std::mutex> lock (mutex);
 	while (!done || !pending.empty())
 	{
@@ -84,10 +84,10 @@ void rai::work_pool::loop (uint64_t thread)
 				while (iteration && output < rai::work_pool::publish_threshold)
 				{
 					work = rng.next ();
-					blake2b_update (&hash, reinterpret_cast <uint8_t *> (&work), sizeof (work));
-					blake2b_update (&hash, current_l.first.bytes.data (), current_l.first.bytes.size ());
-					blake2b_final (&hash, reinterpret_cast <uint8_t *> (&output), sizeof (output));
-					blake2b_init (&hash, sizeof (output));
+					blake2_update (&hash, reinterpret_cast <uint8_t *> (&work), sizeof (work));
+					blake2_update (&hash, current_l.first.bytes.data (), current_l.first.bytes.size ());
+					blake2_final (&hash, reinterpret_cast <uint8_t *> (&output), sizeof (output));
+					blake2_init (&hash, sizeof (output));
 					iteration -= 1;
 				}
 			}
@@ -255,12 +255,12 @@ void rai::wallet_store::deterministic_key (rai::raw_key & prv_a, MDB_txn * trans
 	assert (valid_password (transaction_a));
 	rai::raw_key seed_l;
 	seed (seed_l, transaction_a);
-    blake2b_state hash;
-	blake2b_init (&hash, prv_a.data.bytes.size ());
-    blake2b_update (&hash, seed_l.data.bytes.data (), seed_l.data.bytes.size ());
+    blake2_state hash;
+	blake2_init (&hash, prv_a.data.bytes.size ());
+    blake2_update (&hash, seed_l.data.bytes.data (), seed_l.data.bytes.size ());
 	rai::uint256_union index (index_a);
-    blake2b_update (&hash, reinterpret_cast <uint8_t *> (&index.dwords [7]), sizeof (uint32_t));
-    blake2b_final (&hash, prv_a.data.bytes.data (), prv_a.data.bytes.size ());
+    blake2_update (&hash, reinterpret_cast <uint8_t *> (&index.dwords [7]), sizeof (uint32_t));
+    blake2_final (&hash, prv_a.data.bytes.data (), prv_a.data.bytes.size ());
 }
 
 uint32_t rai::wallet_store::deterministic_index_get (MDB_txn * transaction_a)
