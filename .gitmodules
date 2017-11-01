@@ -13,4 +13,5 @@
 	branch = mdb.RE/0.9
 [submodule "phc-winner-argon2"]
 	path = phc-winner-argon2
-	url = https://github.com/P-H-C/phc-winner-argon2.git
+	url = https://github.com/SergiySW/phc-winner-argon2
+	branch = blake2b_naming
