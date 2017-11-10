@@ -1105,10 +1105,15 @@ void rai::block_processor::process_blocks ()
 		if (!blocks.empty ())
 		{
             {
-                auto info (blocks.front ());
-                blocks.pop_front ();
+                auto completed (blocks.front ().second);
+                while (!blocks.empty () && blocks_processing.size () < rai::blocks_per_transaction)
+				{
+					auto info (blocks.front ());
+					blocks_processing.push_back (info.first);
+					blocks.pop_front ();
+				}
                 lock.unlock ();
-                process_receive_many (info.first, info.second);
+                process_receive_many (completed);
             }
             // Let other threads get an opportunity to transaction lock
             std::this_thread::yield ();
@@ -1126,18 +1131,22 @@ void rai::block_processor::process_blocks ()
 
 void rai::block_processor::process_receive_many (std::shared_ptr <rai::block> block_a, std::function <void (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>)> completed_a)
 {
-	std::vector <std::shared_ptr <rai::block>> blocks;
-	blocks.push_back (block_a);
-    while (!blocks.empty ())
+	blocks_processing.push_back (block_a);
+	process_receive_many (completed_a);
+}
+
+void rai::block_processor::process_receive_many (std::function <void (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>)> completed_a)
+{
+    while (!blocks_processing.empty ())
 	{
 		std::deque <std::pair <std::shared_ptr <rai::block>, rai::process_return>> progress;
 		{
 			rai::transaction transaction (node.store.environment, nullptr, true);
 			auto count (0);
-			while (!blocks.empty () && count < rai::blocks_per_transaction)
+			while (!blocks_processing.empty () && count < rai::blocks_per_transaction)
 			{
-				auto block (blocks.back ());
-				blocks.pop_back ();
+				auto block (blocks_processing.back ());
+				blocks_processing.pop_back ();
 				auto hash (block->hash ());
 				auto process_result (process_receive_one (transaction, block));
 				completed_a (transaction, process_result, block);
@@ -1153,7 +1162,7 @@ void rai::block_processor::process_receive_many (std::shared_ptr <rai::block> bl
 						for (auto i (cached.begin ()), n (cached.end ()); i != n; ++i)
 						{
 							node.store.unchecked_del (transaction, hash, **i);
-							blocks.push_back (std::move (*i));
+							blocks_processing.push_back (std::move (*i));
 						}
 						std::lock_guard <std::mutex> lock (node.gap_cache.mutex);
 						node.gap_cache.blocks.get <1> ().erase (hash);
