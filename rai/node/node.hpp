@@ -441,14 +441,13 @@ public:
     void flush ();
 	void add (std::shared_ptr <rai::block>, std::function <void (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>)> = [] (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>) {});
 	void process_receive_many (std::shared_ptr <rai::block>, std::function <void (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>)> = [] (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>) {});
-	void process_receive_many (std::function <void (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>)> = [] (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>) {});
+	void process_receive_many (std::vector <std::shared_ptr <rai::block>>, std::function <void (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>)> = [] (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>) {});
     rai::process_return process_receive_one (MDB_txn *, std::shared_ptr <rai::block>);
 private:
 	void process_blocks ();
 	bool stopped;
     bool idle;
 	std::deque <std::pair <std::shared_ptr <rai::block>, std::function <void (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>)>>> blocks;
-	std::vector <std::shared_ptr <rai::block>> blocks_processing;
 	std::mutex mutex;
 	std::condition_variable condition;
 	rai::node & node;

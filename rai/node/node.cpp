@@ -1106,6 +1106,7 @@ void rai::block_processor::process_blocks ()
 		{
             {
                 auto completed (blocks.front ().second);
+				std::vector <std::shared_ptr <rai::block>> blocks_processing;
                 while (!blocks.empty () && blocks_processing.size () < rai::blocks_per_transaction)
 				{
 					auto info (blocks.front ());
@@ -1131,11 +1132,12 @@ void rai::block_processor::process_blocks ()
 
 void rai::block_processor::process_receive_many (std::shared_ptr <rai::block> block_a, std::function <void (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>)> completed_a)
 {
+	std::vector <std::shared_ptr <rai::block>> blocks_processing;
 	blocks_processing.push_back (block_a);
-	process_receive_many (completed_a);
+	process_receive_many (blocks_processing, completed_a);
 }
 
-void rai::block_processor::process_receive_many (std::function <void (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>)> completed_a)
+void rai::block_processor::process_receive_many (std::vector <std::shared_ptr <rai::block>> blocks_processing, std::function <void (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>)> completed_a)
 {
     while (!blocks_processing.empty ())
 	{
@@ -1613,7 +1615,7 @@ void rai::network::confirm_send (rai::confirm_ack const & confirm_a, std::shared
 void rai::node::process_active (std::shared_ptr <rai::block> incoming)
 {
 	block_arrival.add (incoming->hash ());
-	block_processor.process_receive_many (incoming);
+	block_processor.add (incoming);
 	if (rai::rai_network == rai::rai_networks::rai_test_network)
 	{
 		block_processor.flush ();
