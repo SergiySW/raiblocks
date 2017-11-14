@@ -1114,7 +1114,7 @@ void rai::block_processor::process_blocks ()
 					blocks.pop_front ();
 				}
                 lock.unlock ();
-                process_receive_many (completed);
+                process_receive_many (blocks_processing, completed);
             }
             // Let other threads get an opportunity to transaction lock
             std::this_thread::yield ();
