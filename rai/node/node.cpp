@@ -1618,10 +1618,10 @@ void rai::node::process_active (std::shared_ptr <rai::block> incoming)
 {
 	block_arrival.add (incoming->hash ());
 	block_processor.add (incoming);
-	if (rai::rai_network == rai::rai_networks::rai_test_network)
+	/*if (rai::rai_network == rai::rai_networks::rai_test_network)
 	{
 		block_processor.flush ();
-	}
+	}*/
 }
 
 rai::process_return rai::node::process (rai::block const & block_a)
