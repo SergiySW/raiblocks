@@ -124,6 +124,7 @@ int main (int argc, char * const * argv)
 		("debug_verify_profile", "Profile signature verification")
 		("debug_profile_sign", "Profile signature generation")
 		("debug_profile_process", "Profile blocks processing")
+		("debug_process_active", "Profile active blocks processing")
 		("debug_xorshift_profile", "Profile xorshift algorithms")
 		("platform", boost::program_options::value <std::string> (), "Defines the <platform> for OpenCL commands")
 		("device", boost::program_options::value <std::string> (), "Defines <device> for OpenCL command")
@@ -417,7 +418,7 @@ int main (int argc, char * const * argv)
 		for (auto i (0); i != 10000000; ++i)
 		{
 			auto begin1 (std::chrono::high_resolution_clock::now ());
-			for (auto j (0); j != 1024; ++j)
+			for (auto j (0); j != 1000; ++j)
 			{
 				--balance;
 				auto send (std::make_shared <rai::send_block> (genesis_latest, landing.pub, balance, rai::test_genesis_key.prv, rai::test_genesis_key.pub, 0));
@@ -425,6 +426,41 @@ int main (int argc, char * const * argv)
 				genesis_latest = send->hash ();
 				auto receive (std::make_shared <rai::receive_block> (landing_latest, genesis_latest, landing.prv, landing.pub, 0));
 				node->block_processor.add (receive);
+				landing_latest = receive->hash ();
+			}
+			auto end1 (std::chrono::high_resolution_clock::now ());
+			std::cerr << boost::str (boost::format ("%|1$ 12d|\n") % std::chrono::duration_cast <std::chrono::microseconds> (end1 - begin1).count ());
+		}
+    }
+    else if (vm.count ("debug_process_active"))
+    {
+		std::cerr << "Starting processing active blocks profiling\n";
+		rai::system system (24000, 1);
+		rai::node_init init;
+		rai::work_pool work (std::numeric_limits <unsigned>::max (), nullptr);
+		rai::logging logging;
+		logging.init (rai::unique_path ());
+		auto node (std::make_shared <rai::node> (init, system.service, 24001, rai::unique_path (), system.alarm, logging, work));
+		rai::keypair landing;
+		rai::block_hash genesis_latest (node->latest (rai::test_genesis_key.pub));
+		rai::uint128_t balance (std::numeric_limits <rai::uint128_t>::max ());
+		rai::send_block genesis_send (genesis_latest, landing.pub, balance, rai::test_genesis_key.prv, rai::test_genesis_key.pub, 0);
+		node->process (genesis_send);
+		genesis_latest = genesis_send.hash ();
+		rai::open_block open (genesis_latest, rai::test_genesis_key.pub, landing.pub, landing.prv, landing.pub, 0);
+		node->process (open);
+		rai::block_hash landing_latest (open.hash ());
+		for (auto i (0); i != 10000000; ++i)
+		{
+			auto begin1 (std::chrono::high_resolution_clock::now ());
+			for (auto j (0); j != 1000; ++j)
+			{
+				--balance;
+				auto send (std::make_shared <rai::send_block> (genesis_latest, landing.pub, balance, rai::test_genesis_key.prv, rai::test_genesis_key.pub, 0));
+				node->process_active (send);
+				genesis_latest = send->hash ();
+				auto receive (std::make_shared <rai::receive_block> (landing_latest, genesis_latest, landing.prv, landing.pub, 0));
+				node->process_active (receive);
 				landing_latest = receive->hash ();
 			}
 			auto end1 (std::chrono::high_resolution_clock::now ());
