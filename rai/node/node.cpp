@@ -1113,6 +1113,8 @@ void rai::block_processor::process_blocks ()
 					blocks_processing.push_back (info.first);
 					blocks.pop_front ();
 				}
+				// Move first blocks to the end of blocks_processing
+				std::reverse (blocks_processing.begin (), blocks_processing.end ());
                 lock.unlock ();
                 process_receive_many (blocks_processing, completed);
             }
