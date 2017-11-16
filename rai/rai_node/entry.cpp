@@ -404,8 +404,9 @@ int main (int argc, char * const * argv)
 		rai::node_init init;
 		rai::work_pool work (std::numeric_limits <unsigned>::max (), nullptr);
 		rai::logging logging;
-		logging.init (rai::unique_path ());
-		auto node (std::make_shared <rai::node> (init, system.service, 24001, rai::unique_path (), system.alarm, logging, work));
+		auto path (rai::unique_path ());
+		logging.init (path);
+		auto node (std::make_shared <rai::node> (init, system.service, 24001, path, system.alarm, logging, work));
 		rai::keypair landing;
 		rai::block_hash genesis_latest (node->latest (rai::test_genesis_key.pub));
 		rai::uint128_t balance (std::numeric_limits <rai::uint128_t>::max ());
@@ -434,38 +435,93 @@ int main (int argc, char * const * argv)
     }
     else if (vm.count ("debug_process_active"))
     {
-		std::cerr << "Starting processing active blocks profiling\n";
+		size_t num_accounts (100000);
+		size_t num_interations (5); // 100,000 * 5 * 2 = 1,000,000 blocks
+		size_t max_blocks (2 * num_accounts * num_interations + num_accounts * 2 + 3);
+		std::cerr << boost::str (boost::format ("Starting pregenerating %1% blocks\n") % (2 * num_accounts * num_interations));
 		rai::system system (24000, 1);
 		rai::node_init init;
 		rai::work_pool work (std::numeric_limits <unsigned>::max (), nullptr);
 		rai::logging logging;
-		logging.init (rai::unique_path ());
-		auto node (std::make_shared <rai::node> (init, system.service, 24001, rai::unique_path (), system.alarm, logging, work));
-		rai::keypair landing;
+		auto path (rai::unique_path ());
+		logging.init (path);
+		auto node (std::make_shared <rai::node> (init, system.service, 24001, path, system.alarm, logging, work));
 		rai::block_hash genesis_latest (node->latest (rai::test_genesis_key.pub));
-		rai::uint128_t balance (std::numeric_limits <rai::uint128_t>::max ());
-		rai::send_block genesis_send (genesis_latest, landing.pub, balance, rai::test_genesis_key.prv, rai::test_genesis_key.pub, 0);
-		node->process (genesis_send);
-		genesis_latest = genesis_send.hash ();
-		rai::open_block open (genesis_latest, rai::test_genesis_key.pub, landing.pub, landing.prv, landing.pub, 0);
-		node->process (open);
-		rai::block_hash landing_latest (open.hash ());
-		for (auto i (0); i != 10000000; ++i)
+		rai::uint128_t genesis_balance (std::numeric_limits <rai::uint128_t>::max ());
+		rai::block_hash landing_latest (0);
+		rai::uint128_t landing_balance (std::numeric_limits <uint64_t>::max ());
+		// Generating keys
+		rai::keypair landing;
+		std::vector <rai::keypair> keys (num_accounts);
+		std::vector <rai::block_hash> frontiers (num_accounts);
 		{
-			auto begin1 (std::chrono::high_resolution_clock::now ());
-			for (auto j (0); j != 1000; ++j)
+			rai::transaction transaction (node->store.environment, nullptr, true);
+			genesis_balance = genesis_balance - landing_balance;
+			rai::send_block genesis_send (genesis_latest, landing.pub, genesis_balance, rai::test_genesis_key.prv, rai::test_genesis_key.pub, work.generate (genesis_latest));
+			node->ledger.process (transaction, genesis_send);
+			genesis_latest = genesis_send.hash ();
+			rai::open_block landing_open (genesis_latest, rai::test_genesis_key.pub, landing.pub, landing.prv, landing.pub, work.generate (landing.pub));
+			node->ledger.process (transaction, landing_open);
+			landing_latest = landing_open.hash ();
+			for (auto i (0); i != num_accounts; ++i)
 			{
-				--balance;
-				auto send (std::make_shared <rai::send_block> (genesis_latest, landing.pub, balance, rai::test_genesis_key.prv, rai::test_genesis_key.pub, 0));
-				node->process_active (send);
-				genesis_latest = send->hash ();
-				auto receive (std::make_shared <rai::receive_block> (landing_latest, genesis_latest, landing.prv, landing.pub, 0));
-				node->process_active (receive);
-				landing_latest = receive->hash ();
+				if (i % 2== 0) // Odd accounts from genesis
+				{
+					--genesis_balance;
+					rai::send_block send (genesis_latest, keys[i].pub, genesis_balance, rai::test_genesis_key.prv, rai::test_genesis_key.pub, work.generate (genesis_latest));
+					node->ledger.process (transaction, send);
+					genesis_latest = send.hash ();
+					rai::open_block open (genesis_latest, rai::test_genesis_key.pub, keys[i].pub, keys[i].prv, keys[i].pub, work.generate (keys[i].pub));
+					node->ledger.process (transaction, open);
+					rai::block_hash open_hash (open.hash ());
+					frontiers[i] = open_hash;
+				}
+				else // Even accounts from landing
+				{
+					--landing_balance;
+					rai::send_block send (landing_latest, keys[i].pub, landing_balance, landing.prv, landing.pub, work.generate (landing_latest));
+					node->ledger.process (transaction, send);
+					landing_latest = send.hash ();
+					rai::open_block open (landing_latest, landing.pub, keys[i].pub, keys[i].prv, keys[i].pub, work.generate (keys[i].pub));
+					node->ledger.process (transaction, open);
+					rai::block_hash open_hash (open.hash ());
+					frontiers[i] = open_hash;
+				}
 			}
-			auto end1 (std::chrono::high_resolution_clock::now ());
-			std::cerr << boost::str (boost::format ("%|1$ 12d|\n") % std::chrono::duration_cast <std::chrono::microseconds> (end1 - begin1).count ());
 		}
+		// Generating blocks
+		std::vector <std::shared_ptr <rai::block>> blocks;
+		for (auto i (0); i != num_interations; ++i)
+		{
+			for (auto j (0); j != num_accounts; ++j)
+			{
+				size_t ring (num_accounts - j - 1);
+				// Sending to another account
+				auto send_ring (std::make_shared <rai::send_block> (frontiers[j], keys[ring].pub, 1, keys[j].prv, keys[j].pub, work.generate (frontiers[j])));
+				frontiers[j] = send_ring->hash ();
+				blocks.push_back (std::move (send_ring));
+				auto receive_ring (std::make_shared <rai::receive_block> (frontiers[ring], frontiers[j], keys[ring].prv, keys[ring].pub, work.generate (frontiers[ring])));
+				frontiers[ring] = receive_ring->hash ();
+				blocks.push_back (std::move (receive_ring));
+			}
+		}
+		// Processing blocks
+		std::cerr << boost::str (boost::format ("Starting processing %1% active blocks\n") % (2 * num_accounts * num_interations));
+		auto begin1 (std::chrono::high_resolution_clock::now ());
+		for (auto i (0); i < blocks.size (); ++i){
+			node->process_active (blocks[i]);
+		}
+		uint64_t block_count (0);
+		while (block_count < max_blocks)
+		{
+			std::this_thread::sleep_for (std::chrono::milliseconds (100));
+			rai::transaction transaction (node->store.environment, nullptr, false);
+			block_count = node->store.block_count (transaction).sum ();
+		}
+		auto end1 (std::chrono::high_resolution_clock::now ());
+		std::cerr << boost::str (boost::format ("%|1$ 12d|\n") % std::chrono::duration_cast <std::chrono::microseconds> (end1 - begin1).count ());
+		rai::transaction transaction (node->store.environment, nullptr, false);
+		std::cerr << boost::str (boost::format ("%1%\n") % node->store.block_count (transaction).sum ());
     }
 #if 0
     else if (vm.count ("debug_xorshift_profile"))
