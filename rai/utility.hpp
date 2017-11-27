@@ -261,6 +261,7 @@ union uint512_union
 using signature = uint512_union;
 rai::uint512_union sign_message (rai::raw_key const &, rai::public_key const &, rai::uint256_union const &);
 bool validate_message (rai::public_key const &, rai::uint256_union const &, rai::uint512_union const &);
+bool validate_messages (std::vector <rai::public_key> const &, std::vector <rai::uint256_union> const &, std::vector <rai::uint512_union> const &, size_t, int *);
 }
 namespace std
 {

@@ -122,6 +122,7 @@ int main (int argc, char * const * argv)
 		("debug_profile_verify", "Profile work verification")
 		("debug_profile_kdf", "Profile kdf function")
 		("debug_verify_profile", "Profile signature verification")
+		("debug_verify_profile_batch", "Profile batch signature verification")
 		("debug_profile_sign", "Profile signature generation")
 		("debug_profile_process", "Profile blocks processing")
 		("debug_process_active", "Profile active blocks processing")
@@ -396,6 +397,31 @@ int main (int argc, char * const * argv)
 			auto end1 (std::chrono::high_resolution_clock::now ());
 			std::cerr << boost::str (boost::format ("%|1$ 12d|\n") % std::chrono::duration_cast <std::chrono::microseconds> (end1 - begin1).count ());
         }
+    }
+    else if (vm.count ("debug_verify_profile_batch"))
+    {
+		rai::keypair key;
+		rai::uint256_union message;
+		rai::uint512_union signature;
+		signature = rai::sign_message (key.prv, key.pub, message);
+		size_t batch_count (64);
+		std::vector <rai::public_key> public_keys (batch_count);
+		std::vector <rai::uint256_union> messages (batch_count);
+		std::vector <rai::uint512_union> signatures (batch_count);
+		int valid[batch_count];
+		for (auto i (0); i < batch_count; ++i)
+		{
+			public_keys[i] = key.pub;
+			messages[i] = message;
+			signatures[i] = signature;
+		}
+		auto begin (std::chrono::high_resolution_clock::now ());
+		for (auto i (0u); i < 16; ++i)
+		{
+			auto result (rai::validate_messages (public_keys, messages, signatures, batch_count, valid));
+		}
+		auto end (std::chrono::high_resolution_clock::now ());
+		std::cerr << "Batch signature verifications " << std::chrono::duration_cast <std::chrono::microseconds> (end - begin).count () << std::endl;
     }
     else if (vm.count ("debug_profile_process"))
     {

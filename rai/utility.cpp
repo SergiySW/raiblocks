@@ -756,6 +756,23 @@ bool rai::validate_message (rai::public_key const & public_key, rai::uint256_uni
     return result;
 }
 
+bool rai::validate_messages (std::vector <rai::public_key> const & public_keys, std::vector <rai::uint256_union> const & messages, std::vector <rai::uint512_union> const & signatures, size_t batch_count, int *valid)
+{
+	size_t message_lengths[batch_count];
+	const unsigned char *message_pointers[batch_count];
+	const unsigned char *pk_pointers[batch_count];
+	const unsigned char *sig_pointers[batch_count];
+	for (auto i (0); i < batch_count; i++)
+	{
+		message_pointers[i] = messages[i].bytes.data ();
+		message_lengths[i] = sizeof (messages[i].bytes);
+		pk_pointers[i] = public_keys[i].bytes.data ();
+		sig_pointers[i] = signatures[i].bytes.data ();
+	}
+	auto result (ed25519_sign_open_batch (message_pointers, message_lengths, pk_pointers, sig_pointers, batch_count, valid));
+	return result;
+}
+
 void rai::open_or_create (std::fstream & stream_a, std::string const & path_a)
 {
 	stream_a.open (path_a, std::ios_base::in);
