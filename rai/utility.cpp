@@ -746,30 +746,30 @@ void ed25519_hash (uint8_t * out, uint8_t const * in, size_t inlen)
 rai::uint512_union rai::sign_message (rai::raw_key const & private_key, rai::public_key const & public_key, rai::uint256_union const & message)
 {
 	rai::uint512_union result;
-    ed25519_sign (message.bytes.data (), sizeof (message.bytes), private_key.data.bytes.data (), public_key.bytes.data (), result.bytes.data ());
+	ed25519_sign (message.bytes.data (), sizeof (message.bytes), private_key.data.bytes.data (), public_key.bytes.data (), result.bytes.data ());
 	return result;
 }
 
 bool rai::validate_message (rai::public_key const & public_key, rai::uint256_union const & message, rai::uint512_union const & signature)
 {
-    auto result (0 != ed25519_sign_open (message.bytes.data (), sizeof (message.bytes), public_key.bytes.data (), signature.bytes.data ()));
-    return result;
+	auto result (0 != ed25519_sign_open (message.bytes.data (), sizeof (message.bytes), public_key.bytes.data (), signature.bytes.data ()));
+	return result;
 }
 
 bool rai::validate_messages (std::vector <rai::public_key> const & public_keys, std::vector <rai::uint256_union> const & messages, std::vector <rai::uint512_union> const & signatures, size_t batch_count, int *valid)
 {
-	size_t message_lengths[batch_count];
-	const unsigned char *message_pointers[batch_count];
-	const unsigned char *pk_pointers[batch_count];
-	const unsigned char *sig_pointers[batch_count];
+	size_t messages_lengths[batch_count];
+	const unsigned char *messages_pointers[batch_count];
+	const unsigned char *public_keys_pointers[batch_count];
+	const unsigned char *signatures_pointers[batch_count];
 	for (auto i (0); i < batch_count; i++)
 	{
-		message_pointers[i] = messages[i].bytes.data ();
-		message_lengths[i] = sizeof (messages[i].bytes);
-		pk_pointers[i] = public_keys[i].bytes.data ();
-		sig_pointers[i] = signatures[i].bytes.data ();
+		messages_pointers[i] = messages[i].bytes.data ();
+		messages_lengths[i] = sizeof (messages[i].bytes);
+		public_keys_pointers[i] = public_keys[i].bytes.data ();
+		signatures_pointers[i] = signatures[i].bytes.data ();
 	}
-	auto result (ed25519_sign_open_batch (message_pointers, message_lengths, pk_pointers, sig_pointers, batch_count, valid));
+	auto result (0 != ed25519_sign_open_batch (messages_pointers, messages_lengths, public_keys_pointers, signatures_pointers, batch_count, valid));
 	return result;
 }
 

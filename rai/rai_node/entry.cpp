@@ -405,16 +405,10 @@ int main (int argc, char * const * argv)
 		rai::uint512_union signature;
 		signature = rai::sign_message (key.prv, key.pub, message);
 		size_t batch_count (64);
-		std::vector <rai::public_key> public_keys (batch_count);
-		std::vector <rai::uint256_union> messages (batch_count);
-		std::vector <rai::uint512_union> signatures (batch_count);
+		std::vector <rai::public_key> public_keys (batch_count, key.pub);
+		std::vector <rai::uint256_union> messages (batch_count, message);
+		std::vector <rai::uint512_union> signatures (batch_count, signature);
 		int valid[batch_count];
-		for (auto i (0); i < batch_count; ++i)
-		{
-			public_keys[i] = key.pub;
-			messages[i] = message;
-			signatures[i] = signature;
-		}
 		auto begin (std::chrono::high_resolution_clock::now ());
 		for (auto i (0u); i < 16; ++i)
 		{

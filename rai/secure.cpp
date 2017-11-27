@@ -3147,6 +3147,276 @@ rai::process_return rai::ledger::process (MDB_txn * transaction_a, rai::block co
 	return processor.result;
 }
 
+std::vector <rai::process_return> rai::ledger::process_batch (MDB_txn * transaction_a, std::vector <std::shared_ptr <rai::block>> const & blocks_a)
+{
+	size_t count (blocks_a.size ());
+	std::vector <rai::process_return> results (count);
+	std::vector <rai::block_hash> hashes (count);
+	std::vector <rai::account> accounts (count);
+	std::vector <rai::block_type> types (count);
+	for (auto i (0); i != count; ++i)
+	{
+		hashes[i] = blocks_a[i]->hash ();
+		types[i] = blocks_a[i]->type ();
+		switch (types[i])
+		{
+			case rai::block_type::send:
+				results[i] = ledger_process_part1 (transaction_a, static_cast <rai::send_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
+				break;
+			case rai::block_type::receive:
+				results[i] = ledger_process_part1 (transaction_a, static_cast <rai::receive_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
+				break;
+			case rai::block_type::open:
+				results[i] = ledger_process_part1 (transaction_a, static_cast <rai::open_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
+				break;
+			case rai::block_type::change:
+				results[i] = ledger_process_part1 (transaction_a, static_cast <rai::change_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
+				break;
+			default:
+				assert(false);
+				break;
+		}
+	}
+	size_t batch_count (0);
+	std::vector <rai::public_key> public_keys;
+	std::vector <rai::uint256_union> messages;
+	std::vector <rai::uint512_union> signatures;
+	for (auto i (0); i != count; ++i)
+	{
+		if (results[i].code == rai::process_result::progress)
+		{
+			public_keys.push_back (accounts[i]);
+			messages.push_back (hashes[i]);
+			switch (types[i])
+			{
+				case rai::block_type::send:
+					signatures.push_back (static_cast <rai::send_block const &> (*blocks_a[i].get ()).signature);
+					break;
+				case rai::block_type::receive:
+					signatures.push_back (static_cast <rai::receive_block const &> (*blocks_a[i].get ()).signature);
+					break;
+				case rai::block_type::open:
+					signatures.push_back (static_cast <rai::open_block const &> (*blocks_a[i].get ()).signature);
+					break;
+				case rai::block_type::change:
+					signatures.push_back (static_cast <rai::change_block const &> (*blocks_a[i].get ()).signature);
+					break;
+				default:
+					assert(false);
+					break;
+			}
+			++batch_count;
+		}
+	}
+	int valid[batch_count];
+	rai::validate_messages (public_keys, messages, signatures, batch_count, valid);
+	batch_count = 0;
+	for (auto i (0); i != count; ++i)
+	{
+		if (results[i].code == rai::process_result::progress)
+		{
+			results[i].code = valid[batch_count] != 1 ? rai::process_result::bad_signature : rai::process_result::progress; // Is the signature valid (Malformed)
+			++batch_count;
+		}
+	}
+	for (auto i (0); i != count; ++i)
+	{
+		if (results[i].code == rai::process_result::progress)
+		{
+			switch (types[i])
+			{
+				case rai::block_type::send:
+					results[i] = ledger_process_part2 (transaction_a, static_cast <rai::send_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
+					break;
+				case rai::block_type::receive:
+					results[i] = ledger_process_part2 (transaction_a, static_cast <rai::receive_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
+					break;
+				case rai::block_type::open:
+					results[i] = ledger_process_part2 (transaction_a, static_cast <rai::open_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
+					break;
+				case rai::block_type::change:
+					results[i] = ledger_process_part2 (transaction_a, static_cast <rai::change_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
+					break;
+				default:
+					assert(false);
+					break;
+			}
+		}
+	}
+	return results;
+}
+
+rai::process_return rai::ledger::ledger_process_part1 (MDB_txn * transaction_a, rai::change_block const & block_a, rai::block_hash const & hash_a, rai::account & account_a)
+{
+	rai::process_return result;
+	auto existing (store.block_exists (transaction_a, hash_a));
+	result.code = existing ? rai::process_result::old : rai::process_result::progress; // Have we seen this block before? (Harmless)
+	if (result.code == rai::process_result::progress)
+	{
+		auto previous (store.block_exists (transaction_a, block_a.hashables.previous));
+		result.code = previous ? rai::process_result::progress : rai::process_result::gap_previous;  // Have we seen the previous block already? (Harmless)
+		if (result.code == rai::process_result::progress)
+		{
+			account_a = store.frontier_get (transaction_a, block_a.hashables.previous);
+			result.code = account_a.is_zero () ? rai::process_result::fork : rai::process_result::progress;
+		}
+	}
+	return result;
+}
+
+rai::process_return rai::ledger::ledger_process_part2 (MDB_txn * transaction_a, rai::change_block const & block_a, rai::block_hash const & hash_a, rai::account const & account_a)
+{
+	rai::process_return result;
+	rai::account_info info;
+	auto latest_error (store.account_get (transaction_a, account_a, info));
+	assert (!latest_error);
+	assert (info.head == block_a.hashables.previous);
+	store.block_put (transaction_a, hash_a, block_a);
+	auto account_balance (balance (transaction_a, block_a.hashables.previous));
+	store.representation_add (transaction_a, hash_a, account_balance);
+	store.representation_add (transaction_a, info.rep_block, 0 - account_balance);
+	change_latest (transaction_a, account_a, hash_a, hash_a, info.balance, info.block_count + 1);
+	store.frontier_del (transaction_a, block_a.hashables.previous);
+	store.frontier_put (transaction_a, hash_a, account_a);
+	result.account = account_a;
+	result.amount = 0;
+	result.code = rai::process_result::progress;
+	return result;
+}
+
+rai::process_return rai::ledger::ledger_process_part1 (MDB_txn * transaction_a, rai::send_block const & block_a, rai::block_hash const & hash_a, rai::account & account_a)
+{
+	rai::process_return result;
+	auto existing (store.block_exists (transaction_a, hash_a));
+	result.code = existing ? rai::process_result::old : rai::process_result::progress; // Have we seen this block before? (Harmless)
+	if (result.code == rai::process_result::progress)
+	{
+		auto previous (store.block_exists (transaction_a, block_a.hashables.previous));
+		result.code = previous ? rai::process_result::progress : rai::process_result::gap_previous; // Have we seen the previous block already? (Harmless)
+		if (result.code == rai::process_result::progress)
+		{
+			account_a = store.frontier_get (transaction_a, block_a.hashables.previous);
+			result.code = account_a.is_zero () ? rai::process_result::fork : rai::process_result::progress;
+		}
+	}
+	return result;
+}
+
+rai::process_return rai::ledger::ledger_process_part2 (MDB_txn * transaction_a, rai::send_block const & block_a, rai::block_hash const & hash_a, rai::account const & account_a)
+{
+	rai::process_return result;
+	rai::account_info info;
+	auto latest_error (store.account_get (transaction_a, account_a, info));
+	assert (!latest_error);
+	assert (info.head == block_a.hashables.previous);
+	result.code = info.balance.number () >= block_a.hashables.balance.number () ? rai::process_result::progress : rai::process_result::overspend; // Is this trying to spend more than they have (Malicious)
+	if (result.code == rai::process_result::progress)
+	{
+		auto amount (info.balance.number () - block_a.hashables.balance.number ());
+		store.representation_add (transaction_a, info.rep_block, 0 - amount);
+		store.block_put (transaction_a, hash_a, block_a);
+		change_latest (transaction_a, account_a, hash_a, info.rep_block, block_a.hashables.balance, info.block_count + 1);
+		store.pending_put (transaction_a, rai::pending_key (block_a.hashables.destination, hash_a), {account_a, amount});
+		store.frontier_del (transaction_a, block_a.hashables.previous);
+		store.frontier_put (transaction_a, hash_a, account_a);
+		result.account = account_a;
+		result.amount = amount;
+	}
+	return result;
+}
+
+rai::process_return rai::ledger::ledger_process_part1 (MDB_txn * transaction_a, rai::receive_block const & block_a, rai::block_hash const & hash_a, rai::account & account_a)
+{
+	rai::process_return result;
+	auto existing (store.block_exists (transaction_a, hash_a));
+	result.code = existing ? rai::process_result::old : rai::process_result::progress; // Have we seen this block already?  (Harmless)
+	if (result.code == rai::process_result::progress)
+	{
+		result.code = store.block_exists (transaction_a, block_a.hashables.source) ? rai::process_result::progress: rai::process_result::gap_source; // Have we seen the source block already? (Harmless)
+		if (result.code == rai::process_result::progress)
+		{
+			auto account_a (store.frontier_get (transaction_a, block_a.hashables.previous));
+			result.code = account_a.is_zero () ? rai::process_result::gap_previous : rai::process_result::progress;  //Have we seen the previous block? No entries for account at all (Harmless)
+			if (result.code != rai::process_result::progress)
+			{
+				result.code = store.block_exists (transaction_a, block_a.hashables.previous) ? rai::process_result::fork : rai::process_result::gap_previous; // If we have the block but it's not the latest we have a signed fork (Malicious)
+			}
+		}
+	}
+	return result;
+}
+
+rai::process_return rai::ledger::ledger_process_part2 (MDB_txn * transaction_a, rai::receive_block const & block_a, rai::block_hash const & hash_a, rai::account const & account_a)
+{
+	rai::process_return result;
+	rai::account_info info;
+	store.account_get (transaction_a, account_a, info);
+	result.code = info.head == block_a.hashables.previous ? rai::process_result::progress : rai::process_result::gap_previous; // Block doesn't immediately follow latest block (Harmless)
+	if (result.code == rai::process_result::progress)
+	{
+		rai::pending_key key (account_a, block_a.hashables.source);
+		rai::pending_info pending;
+		result.code = store.pending_get (transaction_a, key, pending) ? rai::process_result::unreceivable : rai::process_result::progress; // Has this source already been received (Malformed)
+		if (result.code == rai::process_result::progress)
+		{
+			auto new_balance (info.balance.number () + pending.amount.number ());
+			rai::account_info source_info;
+			auto error (store.account_get (transaction_a, pending.source, source_info));
+			assert (!error);
+			store.pending_del (transaction_a, key);
+			store.block_put (transaction_a, hash_a, block_a);
+			change_latest (transaction_a, account_a, hash_a, info.rep_block, new_balance, info.block_count + 1);
+			store.representation_add (transaction_a, info.rep_block, pending.amount.number ());
+			store.frontier_del (transaction_a, block_a.hashables.previous);
+			store.frontier_put (transaction_a, hash_a, account_a);
+			result.account = account_a;
+			result.amount = pending.amount;
+		}
+	}
+	return result;
+}
+
+rai::process_return rai::ledger::ledger_process_part1 (MDB_txn * transaction_a, rai::open_block const & block_a, rai::block_hash const & hash_a, rai::account & account_a)
+{
+	rai::process_return result;
+	auto existing (store.block_exists (transaction_a, hash_a));
+	result.code = existing ? rai::process_result::old : rai::process_result::progress; // Have we seen this block already? (Harmless)
+	if (result.code == rai::process_result::progress)
+	{
+		auto source_missing (!store.block_exists (transaction_a, block_a.hashables.source));
+		result.code = source_missing ? rai::process_result::gap_source : rai::process_result::progress; // Have we seen the source block? (Harmless)
+		account_a = block_a.hashables.account;
+	}
+	return result;
+}
+
+rai::process_return rai::ledger::ledger_process_part2 (MDB_txn * transaction_a, rai::open_block const & block_a, rai::block_hash const & hash_a, rai::account const & account_a)
+{
+	rai::process_return result;
+	rai::account_info info;
+	result.code = store.account_get (transaction_a, account_a, info) ? rai::process_result::progress : rai::process_result::fork; // Has this account already been opened? (Malicious)
+	if (result.code == rai::process_result::progress)
+	{
+		rai::pending_key key (account_a, block_a.hashables.source);
+		rai::pending_info pending;
+		result.code = store.pending_get (transaction_a, key, pending) ? rai::process_result::unreceivable : rai::process_result::progress; // Has this source already been received (Malformed)
+		if (result.code == rai::process_result::progress)
+		{
+			rai::account_info source_info;
+			auto error (store.account_get (transaction_a, pending.source, source_info));
+			assert (!error);
+			store.pending_del (transaction_a, key);
+			store.block_put (transaction_a, hash_a, block_a);
+			change_latest (transaction_a, account_a, hash_a, hash_a, pending.amount.number (), info.block_count + 1);
+			store.representation_add (transaction_a, hash_a, pending.amount.number ());
+			store.frontier_put (transaction_a, hash_a, account_a);
+			result.account = account_a;
+			result.amount = pending.amount;
+		}
+	}
+	return result;
+}
+
 // Money supply for heuristically calculating vote percentages
 rai::uint128_t rai::ledger::supply (MDB_txn * transaction_a)
 {
@@ -3652,6 +3922,14 @@ rai::uint256_union rai::vote::hash () const
     blake2b_update (&hash, bytes.data (), sizeof (bytes));
     blake2b_final (&hash, result.bytes.data (), sizeof (result.bytes));
     return result;
+}
+
+void rai::vote::serialize (rai::stream & stream_a, rai::block_type)
+{
+	write (stream_a, account);
+	write (stream_a, signature);
+	write (stream_a, sequence);
+	block->serialize (stream_a);
 }
 
 void rai::vote::serialize (rai::stream & stream_a)

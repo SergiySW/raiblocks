@@ -338,6 +338,7 @@ public:
 	rai::uint256_union hash () const;
 	bool operator == (rai::vote const &) const;
 	bool operator != (rai::vote const &) const;
+	void serialize (rai::stream &, rai::block_type);
 	void serialize (rai::stream &);
 	std::string to_json () const;
 	// Vote round sequence number
@@ -565,6 +566,15 @@ public:
 	std::string block_text (rai::block_hash const &);
 	rai::uint128_t supply (MDB_txn *);
 	rai::process_return process (MDB_txn *, rai::block const &);
+	std::vector <rai::process_return> process_batch (MDB_txn *, std::vector <std::shared_ptr <rai::block>> const &);
+	rai::process_return ledger_process_part1 (MDB_txn *, rai::change_block const &, rai::block_hash const &, rai::account &);
+	rai::process_return ledger_process_part2 (MDB_txn *, rai::change_block const &, rai::block_hash const &, rai::account const &);
+	rai::process_return ledger_process_part1 (MDB_txn *, rai::send_block const &, rai::block_hash const &, rai::account &);
+	rai::process_return ledger_process_part2 (MDB_txn *, rai::send_block const &, rai::block_hash const &, rai::account const &);
+	rai::process_return ledger_process_part1 (MDB_txn *, rai::receive_block const &, rai::block_hash const &, rai::account &);
+	rai::process_return ledger_process_part2 (MDB_txn *, rai::receive_block const &, rai::block_hash const &, rai::account const &);
+	rai::process_return ledger_process_part1 (MDB_txn *, rai::open_block const &, rai::block_hash const &, rai::account &);
+	rai::process_return ledger_process_part2 (MDB_txn *, rai::open_block const &, rai::block_hash const &, rai::account const &);
 	void rollback (MDB_txn *, rai::block_hash const &);
 	void change_latest (MDB_txn *, rai::account const &, rai::block_hash const &, rai::account const &, rai::uint128_union const &, uint64_t);
 	void checksum_update (MDB_txn *, rai::block_hash const &);
