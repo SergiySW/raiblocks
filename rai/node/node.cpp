@@ -1147,6 +1147,7 @@ void rai::block_processor::process_receive_many (std::deque <std::pair <std::sha
 					case rai::process_result::progress:
 					{
 						progress.push_back (std::make_pair (item.first, process_result));
+						++count;
 					}
 					case rai::process_result::old:
 					{
@@ -1158,12 +1159,18 @@ void rai::block_processor::process_receive_many (std::deque <std::pair <std::sha
 						}
 						std::lock_guard <std::mutex> lock (node.gap_cache.mutex);
 						node.gap_cache.blocks.get <1> ().erase (hash);
+						++count;
+						break;
+					}
+					case rai::process_result::gap_previous:
+					case rai::process_result::gap_source:
+					{
+						++count;
 						break;
 					}
 					default:
 						break;
 				}
-				++count;
 			}
 		}
 		for (auto & i : progress)
