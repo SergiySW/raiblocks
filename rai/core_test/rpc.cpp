@@ -1612,12 +1612,12 @@ TEST (rpc, available_supply)
 
 TEST (rpc, mrai_to_raw)
 {
-    rai::system system (24000, 1);
+	rai::system system (24000, 1);
 	rai::node_init init1;
-    auto & node1 (*system.nodes [0]);
-    rai::rpc rpc (system.service, node1, rai::rpc_config (true));
+	auto & node1 (*system.nodes [0]);
+	rai::rpc rpc (system.service, node1, rai::rpc_config (true));
 	rpc.start ();
-    boost::property_tree::ptree request1;
+	boost::property_tree::ptree request1;
 	request1.put ("action", "mrai_to_raw");
 	request1.put ("amount", "1");
 	test_response response1 (request1, rpc, system.service);
@@ -1625,18 +1625,26 @@ TEST (rpc, mrai_to_raw)
 	{
 		system.poll ();
 	}
-    ASSERT_EQ (200, response1.status);
+	ASSERT_EQ (200, response1.status);
 	ASSERT_EQ (rai::Mxrb_ratio.convert_to <std::string> (), response1.json.get <std::string> ("amount"));
+	request1.put ("amount", "1.010020520000000000000000000001");
+	test_response response2 (request1, rpc, system.service);
+	while (response2.status == 0)
+	{
+		system.poll ();
+	}
+	ASSERT_EQ (200, response2.status);
+	ASSERT_EQ ("1010020520000000000000000000001", response2.json.get <std::string> ("amount"));
 }
 
 TEST (rpc, mrai_from_raw)
 {
-    rai::system system (24000, 1);
+	rai::system system (24000, 1);
 	rai::node_init init1;
-    auto & node1 (*system.nodes [0]);
-    rai::rpc rpc (system.service, node1, rai::rpc_config (true));
+	auto & node1 (*system.nodes [0]);
+	rai::rpc rpc (system.service, node1, rai::rpc_config (true));
 	rpc.start ();
-    boost::property_tree::ptree request1;
+	boost::property_tree::ptree request1;
 	request1.put ("action", "mrai_from_raw");
 	request1.put ("amount", rai::Mxrb_ratio.convert_to <std::string> ());
 	test_response response1 (request1, rpc, system.service);
@@ -1644,8 +1652,16 @@ TEST (rpc, mrai_from_raw)
 	{
 		system.poll ();
 	}
-    ASSERT_EQ (200, response1.status);
-	ASSERT_EQ ("1", response1.json.get <std::string> ("amount"));
+	ASSERT_EQ (200, response1.status);
+	ASSERT_EQ ("1.000000", response1.json.get <std::string> ("amount"));
+	request1.put ("amount", "1010020520000000000000000000001");
+	test_response response2 (request1, rpc, system.service);
+	while (response2.status == 0)
+	{
+		system.poll ();
+	}
+	ASSERT_EQ (200, response2.status);
+	ASSERT_EQ ("1.010020", response2.json.get <std::string> ("amount"));
 }
 
 TEST (rpc, krai_to_raw)
