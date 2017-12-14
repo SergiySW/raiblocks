@@ -1862,9 +1862,10 @@ void rai::rpc_handler::mrai_from_raw ()
 	rai::uint128_union amount;
 	if (!amount.decode_dec (amount_text))
 	{
-		auto result (amount.number () / rai::Mxrb_ratio);
+		std::string mrai_text;
+		amount.encode_float (mrai_text);
 		boost::property_tree::ptree response_l;
-		response_l.put ("amount", result.convert_to <std::string> ());
+		response_l.put ("amount", mrai_text);
 		response (response_l);
 	}
 	else
@@ -1877,19 +1878,11 @@ void rai::rpc_handler::mrai_to_raw ()
 {
 	std::string amount_text (request.get <std::string> ("amount"));
 	rai::uint128_union amount;
-	if (!amount.decode_dec (amount_text))
+	if (!amount.decode_float (amount_text))
 	{
-		auto result (amount.number () * rai::Mxrb_ratio);
-		if (result > amount.number ())
-		{
-			boost::property_tree::ptree response_l;
-			response_l.put ("amount", result.convert_to <std::string> ());
-			response (response_l);
-		}
-		else
-		{
-			error_response (response, "Amount too big");
-		}
+		boost::property_tree::ptree response_l;
+		response_l.put ("amount", amount.number ().convert_to <std::string> ());
+		response (response_l);
 	}
 	else
 	{

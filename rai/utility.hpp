@@ -12,6 +12,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/property_tree/json_parser.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
 
 #include <cryptopp/osrng.h>
 
@@ -166,6 +168,8 @@ public:
 	bool decode_hex (std::string const &);
 	void encode_dec (std::string &) const;
 	bool decode_dec (std::string const &);
+	void encode_float (std::string &) const;
+	bool decode_float (std::string const &);
 	rai::uint128_t number () const;
 	void clear ();
 	bool is_zero () const;

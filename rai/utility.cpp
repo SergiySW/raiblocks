@@ -256,6 +256,50 @@ bool rai::uint128_union::decode_dec (std::string const & text)
 	return result;
 }
 
+void rai::uint128_union::encode_float (std::string & text) const
+{
+	rai::uint128_union integer_part (number () / rai::Mxrb_ratio);
+	std::string text_integer;
+	integer_part.encode_dec (text_integer);
+	rai::uint128_union fractional_part ((number () - integer_part.number () * rai::Mxrb_ratio) / xrb_ratio);
+	std::string text_fractional;
+	fractional_part.encode_dec (text_fractional);
+	// Fill with leading zeroes
+	std::stringstream stream;
+	stream << std::setw (6) << std::setfill('0') << text_fractional ;
+	text = text_integer + "." + stream.str ();
+}
+
+bool rai::uint128_union::decode_float (std::string const & text)
+{
+	auto result (text.size () > 40);
+	if (!result)
+	{
+		std::vector <std::string> parts;
+		boost::split (parts, text, boost::is_any_of ("."));
+		rai::uint128_union integer_part;
+		rai::uint128_union fractional_part (0);
+		result = integer_part.decode_dec (parts[0]);
+		if (parts.size () > 1)
+		{
+			if (parts[1].size () <= 30)
+			{
+				std::stringstream stream;
+				stream << "1" << std::setw (30) << std::setfill('0') << std::left << parts[1];
+				result = fractional_part.decode_dec (stream.str ());
+				// Trick to prevent decoding leading zero as an octal numeral system
+				fractional_part = fractional_part.number () - rai::Mxrb_ratio;
+			}
+			else
+			{
+				result = true;
+			}
+		}
+		*this = integer_part.number () * rai::Mxrb_ratio + fractional_part.number ();
+	}
+	return result;
+}
+
 void rai::uint128_union::clear ()
 {
 	qwords.fill (0);
