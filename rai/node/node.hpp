@@ -388,6 +388,7 @@ public:
 	std::vector <std::pair <boost::asio::ip::address, uint16_t>> work_peers;
 	std::vector <std::string> preconfigured_peers;
 	std::vector <rai::account> preconfigured_representatives;
+	std::string fast_sync;
 	unsigned bootstrap_fraction_numerator;
 	rai::amount receive_minimum;
 	rai::amount inactive_supply;

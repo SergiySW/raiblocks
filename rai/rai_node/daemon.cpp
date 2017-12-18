@@ -94,7 +94,7 @@ bool rai_daemon::daemon_config::upgrade_json (unsigned version_a, boost::propert
 	return result;
 }
 
-void rai_daemon::daemon::run (boost::filesystem::path const & data_path)
+void rai_daemon::daemon::run (boost::filesystem::path const & data_path, std::string const & fast_sync)
 {
 	boost::filesystem::create_directories (data_path);
     rai_daemon::daemon_config config (data_path);
@@ -105,6 +105,7 @@ void rai_daemon::daemon::run (boost::filesystem::path const & data_path)
 	if (!error)
 	{
 		config.node.logging.init (data_path);
+		config.node.fast_sync = fast_sync;
 		config_file.close ();
 		boost::asio::io_service service;
 		rai::work_pool work (config.node.work_threads, rai::opencl_work::create (config.opencl_enable, config.opencl, config.node.logging));

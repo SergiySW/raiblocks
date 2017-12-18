@@ -917,7 +917,42 @@ bool rai::bootstrap_attempt::consume_future (std::future <bool> & future_a)
 
 void rai::bootstrap_attempt::populate_connections ()
 {
-	if (connections < node->config.bootstrap_connections)
+	if (!node->config.fast_sync.empty ())
+	{
+		if (clients.empty ())
+		{
+			auto bootstrap_attempt_l (shared_from_this ());
+			auto node_l (node);
+			auto fast_peer (node->config.fast_sync);
+			auto port_a (rai::network::node_port);
+			node->network.resolver.async_resolve (boost::asio::ip::udp::resolver::query (fast_peer, std::to_string (port_a)), [node_l, bootstrap_attempt_l, fast_peer, port_a] (boost::system::error_code const & ec, boost::asio::ip::udp::resolver::iterator i_a)
+			{
+				if (!ec)
+				{
+					for (auto i (i_a), n (boost::asio::ip::udp::resolver::iterator {}); i != n; ++i)
+					{
+						auto endpoint (i->endpoint ());
+						if (endpoint.address ().is_v4 ())
+						{
+							endpoint = rai::endpoint (boost::asio::ip::address_v6::v4_mapped (endpoint.address ().to_v4 ()), endpoint.port ());
+						}
+						rai::tcp_endpoint tcp_endpoint;
+						tcp_endpoint.address (endpoint.address ());
+						tcp_endpoint.port (endpoint.port ());
+						auto client (std::make_shared <rai::bootstrap_client> (node_l, bootstrap_attempt_l, tcp_endpoint));
+						client->run ();
+						bootstrap_attempt_l->clients.push_back (client);
+					}
+				}
+				else
+				{
+					BOOST_LOG (node_l->log) << boost::str (boost::format ("Error resolving address: %1%:%2%, %3%") % fast_peer % port_a % ec.message ());
+					node_l->config.fast_sync = "";
+				}
+			});
+		}
+	}
+	else if (connections < node->config.bootstrap_connections)
 	{
 		auto peer (node->peers.bootstrap_peer ());
 		if (peer != rai::endpoint (boost::asio::ip::address_v6::any (), 0))
@@ -944,6 +979,10 @@ void rai::bootstrap_attempt::populate_connections ()
 				this_l->populate_connections ();
 			}
 		});
+	}
+	else
+	{
+		node->config.fast_sync = "";
 	}
 }
 

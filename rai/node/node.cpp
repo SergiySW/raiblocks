@@ -2903,6 +2903,7 @@ void rai::add_node_options (boost::program_options::options_description & descri
 	("account_get", "Get account number for the <key>")
 	("account_key", "Get the public key for <account>")
 	("data_path", boost::program_options::value <std::string> (), "Use the supplied path as the data directory")
+	("fast_sync", boost::program_options::value <std::string> ()->default_value ("")->implicit_value (""), "Use the supplied IP address or hostname to perform fast synchronization")
 	("diagnostics", "Run internal diagnostics")
 	("key_create", "Generates a adhoc random keypair and prints it to stdout")
 	("key_expand", "Derive public key and account number from <key>")

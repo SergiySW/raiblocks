@@ -145,8 +145,17 @@ int main (int argc, char * const * argv)
 		{
 			data_path = rai::working_path ();
 		}
+		std::string fast_sync;
+		if (vm.count ("fast_sync"))
+		{
+			fast_sync = vm ["fast_sync"].as <std::string> ();
+			if (fast_sync.empty ())
+			{
+				fast_sync = "bootstrap.raiblocks.net";
+			}
+		}
 		rai_daemon::daemon daemon;
-		daemon.run (data_path);
+		daemon.run (data_path, fast_sync);
 	}
 	else if (vm.count ("debug_block_count"))
 	{
