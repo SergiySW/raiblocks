@@ -446,18 +446,18 @@ rai::block_req_client::~block_req_client ()
 
 void rai::block_req_client::request (rai::account const & start, rai::account const & end, uint32_t const & count)
 {
-	rai::bulk_pull req;
-	req.start = start;
-	req.end = end;
-	req.count = count;
+	std::unique_ptr <rai::block_req> request (new rai::block_req);
+	request->start = start;
+	request->end = end;
+	request->count = count;
 	auto buffer (std::make_shared <std::vector <uint8_t>> ());
 	{
 		rai::vectorstream stream (*buffer);
-		req.serialize (stream);
+		request->serialize (stream);
 	}
 	if (connection->node->config.logging.bulk_pull_logging ())
 	{
-		BOOST_LOG (connection->node->log) << boost::str (boost::format ("Blocks requesting from account %1% down to %2% from %3%") % req.start.to_account () % req.end.to_account () % connection->endpoint);
+		BOOST_LOG (connection->node->log) << boost::str (boost::format ("Blocks requesting from account %1% down to %2% from %3%") % request->start.to_account () % request->end.to_account () % connection->endpoint);
 	}
 	auto this_l (shared_from_this ());
 	connection->start_timeout ();
