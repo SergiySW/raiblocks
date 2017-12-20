@@ -461,6 +461,53 @@ bool rai::frontier_req::operator == (rai::frontier_req const & other_a) const
     return start == other_a.start && age == other_a.age && count == other_a.count;
 }
 
+rai::block_req::block_req () :
+message (rai::message_type::block_req)
+{
+}
+
+bool rai::block_req::deserialize (rai::stream & stream_a)
+{
+	auto result (read_header (stream_a, version_max, version_using, version_min, type, extensions));
+	assert (!result);
+	assert (rai::message_type::block_req == type);
+	if (!result)
+	{
+		assert (type == rai::message_type::block_req);
+		result = read (stream_a, start.bytes);
+		if (!result)
+		{
+			result = read (stream_a, end.bytes);
+			if (!result)
+			{
+				if (!result)
+				{
+					result = read (stream_a, count);
+				}
+			}
+		}
+	}
+	return result;
+}
+
+void rai::block_req::serialize (rai::stream & stream_a)
+{
+	write_header (stream_a);
+	write (stream_a, start.bytes);
+	write (stream_a, end.bytes);
+	write (stream_a, count);
+}
+
+void rai::block_req::visit (rai::message_visitor & visitor_a) const
+{
+	visitor_a.block_req (*this);
+}
+
+bool rai::block_req::operator == (rai::block_req const & other_a) const
+{
+	return start == other_a.start && end == other_a.end && count == other_a.count;
+}
+
 rai::bulk_pull::bulk_pull () :
 message (rai::message_type::bulk_pull)
 {

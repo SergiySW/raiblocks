@@ -12,7 +12,8 @@ public:
     confirm_ack_count (0),
     bulk_pull_count (0),
     bulk_push_count (0),
-    frontier_req_count (0)
+    frontier_req_count (0),
+    block_req_count (0)
     {
     }
     void keepalive (rai::keepalive const &)
@@ -43,6 +44,10 @@ public:
     {
         ++frontier_req_count;
     }
+    void block_req (rai::block_req const &)
+    {
+        ++block_req_count;
+    }
     uint64_t keepalive_count;
     uint64_t publish_count;
     uint64_t confirm_req_count;
@@ -50,6 +55,7 @@ public:
     uint64_t bulk_pull_count;
     uint64_t bulk_push_count;
     uint64_t frontier_req_count;
+    uint64_t block_req_count;
 };
 }
 

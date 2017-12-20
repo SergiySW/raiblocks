@@ -110,6 +110,18 @@ public:
 	std::chrono::system_clock::time_point next_report;
 	std::promise <bool> promise;
 };
+class block_req_client : public std::enable_shared_from_this <rai::block_req_client>
+{
+public:
+	block_req_client (std::shared_ptr <rai::bootstrap_client>);
+	~block_req_client ();
+	void request (rai::account const &, rai::account const &, uint32_t const &);
+	void receive_block ();
+	void received_type ();
+	void received_block (boost::system::error_code const &, size_t);
+	std::shared_ptr <rai::bootstrap_client> connection;
+	rai::pull_info pull;
+};
 class bulk_pull_client : public std::enable_shared_from_this <rai::bulk_pull_client>
 {
 public:
@@ -202,6 +214,7 @@ public:
     void receive_header_action (boost::system::error_code const &, size_t);
     void receive_bulk_pull_action (boost::system::error_code const &, size_t);
     void receive_frontier_req_action (boost::system::error_code const &, size_t);
+    void receive_block_req_action (boost::system::error_code const &, size_t);
     void receive_bulk_push_action ();
     void add_request (std::unique_ptr <rai::message>);
     void finish_request ();
@@ -256,5 +269,24 @@ public:
     std::unique_ptr <rai::frontier_req> request;
     std::vector <uint8_t> send_buffer;
     size_t count;
+};
+class block_req;
+class block_req_server : public std::enable_shared_from_this <rai::block_req_server>
+{
+public:
+	block_req_server (std::shared_ptr <rai::bootstrap_server> const &, std::unique_ptr <rai::block_req>);
+	void set_current_end ();
+	std::unique_ptr <rai::block> get_next ();
+	void open_blocks_list ();
+	void send_next ();
+	void sent_action (boost::system::error_code const &, size_t);
+	void send_finished ();
+	void no_block_sent (boost::system::error_code const &, size_t);
+	std::shared_ptr <rai::bootstrap_server> connection;
+	std::unique_ptr <rai::block_req> request;
+	std::vector <uint8_t> send_buffer;
+	rai::block_hash current;
+	size_t count;
+	std::queue <rai::block_hash> open_blocks;
 };
 }

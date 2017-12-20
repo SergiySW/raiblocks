@@ -92,7 +92,8 @@ enum class message_type : uint8_t
     confirm_ack,
     bulk_pull,
     bulk_push,
-    frontier_req
+    frontier_req,
+    block_req
 };
 class message_visitor;
 class message
@@ -191,6 +192,18 @@ public:
     uint32_t age;
     uint32_t count;
 };
+class block_req : public message
+{
+public:
+    block_req ();
+    bool deserialize (rai::stream &) override;
+    void serialize (rai::stream &) override;
+    void visit (rai::message_visitor &) const override;
+    bool operator == (rai::block_req const &) const;
+    rai::account start;
+    rai::account end;
+    uint32_t count;
+};
 class bulk_pull : public message
 {
 public:
@@ -220,6 +233,7 @@ public:
     virtual void bulk_pull (rai::bulk_pull const &) = 0;
     virtual void bulk_push (rai::bulk_push const &) = 0;
     virtual void frontier_req (rai::frontier_req const &) = 0;
+    virtual void block_req (rai::block_req const &) = 0;
 };
 template <typename ... T>
 class observer_set

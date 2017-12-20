@@ -417,6 +417,10 @@ public:
     {
         assert (false);
     }
+    void block_req (rai::block_req const &) override
+    {
+        assert (false);
+    }
     rai::node & node;
     rai::endpoint sender;
 };
