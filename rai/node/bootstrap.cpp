@@ -1953,24 +1953,12 @@ void rai::frontier_req_server::next ()
 // -------------------------- //
 rai::block_req_server::block_req_server (std::shared_ptr <rai::bootstrap_server> const & connection_a, std::unique_ptr <rai::block_req> request_a) :
 connection (connection_a),
+current_account (request_a->start.number ()),
 request (std::move (request_a))
 {
-	open_blocks_list ();
-}
-
-void rai::block_req_server::open_blocks_list ()
-{
 	rai::transaction transaction (connection->node->store.environment, nullptr, false);
-	for (auto i (connection->node->store.latest_begin (transaction, request->start.number ())), n (connection->node->store.latest_begin (transaction, request->end.number ())); i != n && open_blocks.size () != count; ++i)
-	{
-		rai::block_hash open_block (rai::account_info (i->second).open_block);
-		open_blocks.push (open_block);
-	}
-	if (!open_blocks.empty ())
-	{
-		current = open_blocks.front ();
-		open_blocks.pop ();
-	}
+	auto account_store (connection->node->store.latest_begin (transaction, request->end.number ()));
+	end_account = account_store->first.uint256 ();
 }
 
 void rai::block_req_server::send_next ()
@@ -2004,10 +1992,20 @@ std::unique_ptr <rai::block> rai::block_req_server::get_next ()
 	std::unique_ptr <rai::block> result;
 	rai::transaction transaction (connection->node->store.environment, nullptr, false);
 	current = connection->node->store.block_successor (transaction, current);
-	if (current.is_zero () && !open_blocks.empty ())
+	if (current.is_zero () && count != 0)
 	{
-		current = open_blocks.front ();
-		open_blocks.pop ();
+		auto account_store (connection->node->store.latest_begin (transaction, current_account));
+		current_account = account_store->first.uint256 ();
+		if (end_account != current_account)
+		{
+			current = rai::account_info (account_store->second).open_block;
+		}
+		current_account = current_account.number () + 1;;
+		--count;
+	}
+	if (!current.is_zero ())
+	{
+		result = connection->node->store.block_get (transaction, current);
 	}
 	return result;
 }

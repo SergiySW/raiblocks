@@ -277,7 +277,6 @@ public:
 	block_req_server (std::shared_ptr <rai::bootstrap_server> const &, std::unique_ptr <rai::block_req>);
 	void set_current_end ();
 	std::unique_ptr <rai::block> get_next ();
-	void open_blocks_list ();
 	void send_next ();
 	void sent_action (boost::system::error_code const &, size_t);
 	void send_finished ();
@@ -286,7 +285,8 @@ public:
 	std::unique_ptr <rai::block_req> request;
 	std::vector <uint8_t> send_buffer;
 	rai::block_hash current;
+	rai::account current_account;
+	rai::account end_account;
 	size_t count;
-	std::queue <rai::block_hash> open_blocks;
 };
 }
