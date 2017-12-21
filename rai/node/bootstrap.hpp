@@ -80,6 +80,7 @@ public:
 	std::deque <std::weak_ptr <rai::bootstrap_client>> clients;
 	std::weak_ptr <rai::frontier_req_client> frontiers;
 	std::weak_ptr <rai::bulk_push_client> push;
+	rai::account fast_sync_account;
     std::deque <rai::pull_info> pulls;
 	std::vector <std::shared_ptr <rai::bootstrap_client>> idle;
 	std::atomic <unsigned> connections;
@@ -118,7 +119,7 @@ public:
 	void request (rai::account const &, rai::account const &, uint32_t const &);
 	void receive_block ();
 	void received_type ();
-	void received_block (boost::system::error_code const &, size_t);
+	void received_block (boost::system::error_code const &, size_t, bool);
 	std::shared_ptr <rai::bootstrap_client> connection;
 	rai::pull_info pull;
 };

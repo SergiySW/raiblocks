@@ -505,7 +505,7 @@ void rai::block_req_client::received_type ()
             boost::asio::async_read (connection->socket, boost::asio::buffer (connection->receive_buffer.data () + 1, rai::send_block::size), [this_l] (boost::system::error_code const & ec, size_t size_a)
             {
 				this_l->connection->stop_timeout ();
-                this_l->received_block (ec, size_a);
+                this_l->received_block (ec, size_a, false);
             });
             break;
         }
@@ -515,7 +515,7 @@ void rai::block_req_client::received_type ()
             boost::asio::async_read (connection->socket, boost::asio::buffer (connection->receive_buffer.data () + 1, rai::receive_block::size), [this_l] (boost::system::error_code const & ec, size_t size_a)
             {
 				this_l->connection->stop_timeout ();
-                this_l->received_block (ec, size_a);
+                this_l->received_block (ec, size_a, false);
             });
             break;
         }
@@ -525,7 +525,7 @@ void rai::block_req_client::received_type ()
             boost::asio::async_read (connection->socket, boost::asio::buffer (connection->receive_buffer.data () + 1, rai::open_block::size), [this_l] (boost::system::error_code const & ec, size_t size_a)
             {
 				this_l->connection->stop_timeout ();
-                this_l->received_block (ec, size_a);
+                this_l->received_block (ec, size_a, true);
             });
             break;
         }
@@ -535,7 +535,7 @@ void rai::block_req_client::received_type ()
             boost::asio::async_read (connection->socket, boost::asio::buffer (connection->receive_buffer.data () + 1, rai::change_block::size), [this_l] (boost::system::error_code const & ec, size_t size_a)
             {
 				this_l->connection->stop_timeout ();
-                this_l->received_block (ec, size_a);
+                this_l->received_block (ec, size_a, false);
             });
             break;
         }
@@ -545,13 +545,15 @@ void rai::block_req_client::received_type ()
         }
         default:
         {
+			connection->node->bootstrap_initiator.attempt->clients.clear (); // temp
+			//connection->socket.close ();
             BOOST_LOG (connection->node->log) << boost::str (boost::format ("Unknown type received as block type: %1%") % static_cast <int> (type));
             break;
         }
     }
 }
 
-void rai::block_req_client::received_block (boost::system::error_code const & ec, size_t size_a)
+void rai::block_req_client::received_block (boost::system::error_code const & ec, size_t size_a, bool is_open_block)
 {
 	if (!ec)
 	{
@@ -566,6 +568,14 @@ void rai::block_req_client::received_block (boost::system::error_code const & ec
                 block->serialize_json (block_l);
                 BOOST_LOG (connection->node->log) << boost::str (boost::format ("Pulled block %1% %2%") % hash.to_string () % block_l);
             }
+			if (is_open_block)
+			{
+				if (!connection->node->bootstrap_initiator.stopped)
+				{
+					auto block_a (dynamic_cast <rai::open_block *> (block.get ()));
+					connection->attempt->fast_sync_account = block_a->hashables.account;
+				}
+			}
 			auto attempt_l (connection->attempt);
 			attempt_l->node->block_processor.add (block, [attempt_l] (MDB_txn * transaction_a, rai::process_return result_a, std::shared_ptr <rai::block> block_a)
 			{
@@ -931,7 +941,8 @@ connections (0),
 pulling (0),
 node (node_a),
 account_count (0),
-stopped (false)
+stopped (false),
+fast_sync_account (0)
 {
 	BOOST_LOG (node->log) << "Starting bootstrap attempt";
 	node->bootstrap_initiator.notify_listeners (true);
@@ -1111,12 +1122,12 @@ void rai::bootstrap_attempt::populate_connections ()
 						tcp_endpoint.address (endpoint.address ());
 						tcp_endpoint.port (endpoint.port ());
 						std::unique_lock <std::mutex> lock (bootstrap_attempt_l->mutex);
-						bootstrap_attempt_l->stopped = true;
+						//bootstrap_attempt_l->stopped = true;
 						auto connection_l (std::make_shared <rai::bootstrap_client> (node_l, bootstrap_attempt_l, tcp_endpoint));
 						connection_l->run ();
-						//bootstrap_attempt_l->clients.push_back (connection_l);
+						bootstrap_attempt_l->clients.push_back (connection_l);
 						auto client (std::make_shared <rai::block_req_client> (connection_l));
-						client->request (0, std::numeric_limits <rai::uint256_t>::max (), std::numeric_limits <uint32_t>::max ());
+						client->request (bootstrap_attempt_l->fast_sync_account, std::numeric_limits <rai::uint256_t>::max (), std::numeric_limits <uint32_t>::max ());
 					}
 				}
 				else
@@ -1157,6 +1168,7 @@ void rai::bootstrap_attempt::populate_connections ()
 	}
 	else
 	{
+		BOOST_LOG (node->log) << boost::str (boost::format ("Ending fast sync"));
 		node->config.fast_sync = "";
 	}
 }
@@ -2011,6 +2023,7 @@ std::unique_ptr <rai::block> rai::block_req_server::get_next ()
 			current_account = current_account.number () + 1;
 		}
 		--count;
+		BOOST_LOG (connection->node->log) << boost::str (boost::format ("block_req_server account: %1%") % current_account.to_account ());
 	}
 	if (!current.is_zero ())
 	{
