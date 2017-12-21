@@ -493,8 +493,8 @@ bool rai::block_req::deserialize (rai::stream & stream_a)
 void rai::block_req::serialize (rai::stream & stream_a)
 {
 	write_header (stream_a);
-	write (stream_a, start.bytes);
-	write (stream_a, end.bytes);
+	write (stream_a, start);
+	write (stream_a, end);
 	write (stream_a, count);
 }
 

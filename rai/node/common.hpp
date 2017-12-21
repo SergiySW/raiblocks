@@ -200,8 +200,8 @@ public:
     void serialize (rai::stream &) override;
     void visit (rai::message_visitor &) const override;
     bool operator == (rai::block_req const &) const;
-    rai::account start;
-    rai::account end;
+    rai::uint256_union start;
+    rai::uint256_union end;
     uint32_t count;
 };
 class bulk_pull : public message

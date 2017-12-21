@@ -457,7 +457,7 @@ void rai::block_req_client::request (rai::account const & start, rai::account co
 	}
 	if (connection->node->config.logging.bulk_pull_logging ())
 	{
-		BOOST_LOG (connection->node->log) << boost::str (boost::format ("Blocks requesting from account %1% down to %2% from %3%") % request->start.to_account () % request->end.to_account () % connection->endpoint);
+		BOOST_LOG (connection->node->log) << boost::str (boost::format ("Blocks requesting from account %1% to account %2% from %3%") % request->start.to_account () % request->end.to_account () % connection->endpoint);
 	}
 	auto this_l (shared_from_this ());
 	connection->start_timeout ();
@@ -1110,11 +1110,13 @@ void rai::bootstrap_attempt::populate_connections ()
 						rai::tcp_endpoint tcp_endpoint;
 						tcp_endpoint.address (endpoint.address ());
 						tcp_endpoint.port (endpoint.port ());
+						std::unique_lock <std::mutex> lock (bootstrap_attempt_l->mutex);
+						bootstrap_attempt_l->stopped = true;
 						auto connection_l (std::make_shared <rai::bootstrap_client> (node_l, bootstrap_attempt_l, tcp_endpoint));
-						bootstrap_attempt_l->clients.push_back (connection_l);
+						connection_l->run ();
+						//bootstrap_attempt_l->clients.push_back (connection_l);
 						auto client (std::make_shared <rai::block_req_client> (connection_l));
 						client->request (0, std::numeric_limits <rai::uint256_t>::max (), std::numeric_limits <uint32_t>::max ());
-						bootstrap_attempt_l->stopped = true;
 					}
 				}
 				else
@@ -1433,6 +1435,7 @@ void rai::bootstrap_server::receive_header_action (boost::system::error_code con
 				}
 				case rai::message_type::block_req:
 				{
+					BOOST_LOG (node->log) << boost::str (boost::format ("Received rai::message_type::block_req"));
 					auto this_l (shared_from_this ());
 					boost::asio::async_read (*socket, boost::asio::buffer (receive_buffer.data () + 8, sizeof (rai::uint256_union) + sizeof (rai::uint256_union) + sizeof (uint32_t)), [this_l] (boost::system::error_code const & ec, size_t size_a)
 					{
@@ -1512,6 +1515,7 @@ void rai::bootstrap_server::receive_frontier_req_action (boost::system::error_co
 
 void rai::bootstrap_server::receive_block_req_action (boost::system::error_code const & ec, size_t size_a)
 {
+	BOOST_LOG (node->log) << boost::str (boost::format ("Received receive_block_req_action"));
     if (!ec)
     {
         std::unique_ptr <rai::block_req> request (new rai::block_req);
@@ -1592,6 +1596,7 @@ public:
     }
     void block_req (rai::block_req const &) override
     {
+		BOOST_LOG (connection->node->log) << boost::str (boost::format ("request_response_visitor : public rai::message_visitor block_req ")); // to delete
         auto response (std::make_shared <rai::block_req_server> (connection, std::unique_ptr <rai::block_req> (static_cast <rai::block_req *> (connection->requests.front ().release ()))));
         response->send_next ();
     }
@@ -1953,12 +1958,13 @@ void rai::frontier_req_server::next ()
 // -------------------------- //
 rai::block_req_server::block_req_server (std::shared_ptr <rai::bootstrap_server> const & connection_a, std::unique_ptr <rai::block_req> request_a) :
 connection (connection_a),
-current_account (request_a->start.number ()),
-request (std::move (request_a))
+current_account (request_a->start),
+end_account (request_a->end)//,
+//request (std::move (request_a))
 {
-	rai::transaction transaction (connection->node->store.environment, nullptr, false);
-	auto account_store (connection->node->store.latest_begin (transaction, request->end.number ()));
-	end_account = account_store->first.uint256 ();
+	//rai::transaction transaction (connection->node->store.environment, nullptr, false);
+	//auto account_store (connection->node->store.latest_begin (transaction, end_account));
+	//end_account = account_store->first.uint256 ();
 }
 
 void rai::block_req_server::send_next ()
@@ -1995,12 +2001,15 @@ std::unique_ptr <rai::block> rai::block_req_server::get_next ()
 	if (current.is_zero () && count != 0)
 	{
 		auto account_store (connection->node->store.latest_begin (transaction, current_account));
-		current_account = account_store->first.uint256 ();
-		if (end_account != current_account)
+		if (account_store != connection->node->store.latest_end ())
 		{
-			current = rai::account_info (account_store->second).open_block;
+			current_account = account_store->first.uint256 ();
+			if (end_account != current_account)
+			{
+				current = rai::account_info (account_store->second).open_block;
+			}
+			current_account = current_account.number () + 1;
 		}
-		current_account = current_account.number () + 1;;
 		--count;
 	}
 	if (!current.is_zero ())
@@ -2024,6 +2033,7 @@ void rai::block_req_server::sent_action (boost::system::error_code const & ec, s
 
 void rai::block_req_server::send_finished ()
 {
+	BOOST_LOG (connection->node->log) << "send_finished block_req_server"; // to delete
 	send_buffer.clear ();
 	send_buffer.push_back (static_cast <uint8_t> (rai::block_type::not_a_block));
 	auto this_l (shared_from_this ());
@@ -2039,6 +2049,7 @@ void rai::block_req_server::send_finished ()
 
 void rai::block_req_server::no_block_sent (boost::system::error_code const & ec, size_t size_a)
 {
+	BOOST_LOG (connection->node->log) << "Finishing block_req_server"; // to delete
 	if (!ec)
 	{
 		assert (size_a == 1);
