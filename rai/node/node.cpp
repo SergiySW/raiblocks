@@ -1141,24 +1141,31 @@ void rai::block_processor::process_receive_many (std::shared_ptr <rai::block> bl
 
 void rai::block_processor::process_receive_many (std::vector <std::shared_ptr <rai::block>> blocks_processing, std::function <void (MDB_txn *, rai::process_return, std::shared_ptr <rai::block>)> completed_a)
 {
-    while (!blocks_processing.empty ())
+	while (!blocks_processing.empty ())
 	{
 		std::deque <std::pair <std::shared_ptr <rai::block>, rai::process_return>> progress;
 		{
 			rai::transaction transaction (node.store.environment, nullptr, true);
 			auto count (0);
-			while (!blocks_processing.empty () && count < rai::blocks_per_transaction)
+			std::vector <std::shared_ptr <rai::block>> blocks_a;
+			blocks_a.reserve (rai::blocks_per_transaction);
+			while (!blocks_processing.empty () && blocks_a.size () < rai::blocks_per_transaction)
 			{
 				auto block (blocks_processing.back ());
 				blocks_processing.pop_back ();
-				auto hash (block->hash ());
-				auto process_result (process_receive_one (transaction, block));
-				completed_a (transaction, process_result, block);
-				switch (process_result.code)
+				blocks_a.push_back (block);
+				++count;
+			}
+			auto results {node.ledger.process_batch (transaction, blocks_a)};
+			for (auto i (0); i != blocks_a.size (); ++i)
+			{
+				auto hash (blocks_a[i]->hash ());
+				completed_a (transaction, results[i], blocks_a[i]);
+				switch (results[i].code)
 				{
 					case rai::process_result::progress:
 					{
-						progress.push_back (std::make_pair (block, process_result));
+						progress.push_back (std::make_pair (blocks_a[i], results[i]));
 					}
 					case rai::process_result::old:
 					{
@@ -1172,17 +1179,29 @@ void rai::block_processor::process_receive_many (std::vector <std::shared_ptr <r
 						node.gap_cache.blocks.get <1> ().erase (hash);
 						break;
 					}
+					case rai::process_result::gap_previous:
+					{
+						node.store.unchecked_put (transaction, blocks_a[i]->previous (), blocks_a[i]);
+						node.gap_cache.add (transaction, blocks_a[i]);
+						break;
+					}
+					case rai::process_result::gap_source:
+					{
+						node.store.unchecked_put (transaction, blocks_a[i]->source (), blocks_a[i]);
+						node.gap_cache.add (transaction, blocks_a[i]);
+						break;
+					}
+					// TODO: copy all results from process_receive_one
 					default:
 						break;
 				}
-				++count;
 			}
 		}
 		for (auto & i : progress)
 		{
 			node.observers.blocks (i.first, i.second.account, i.second.amount);
 		}
-    }
+	}
 }
 
 rai::process_return rai::block_processor::process_receive_one (MDB_txn * transaction_a, std::shared_ptr <rai::block> block_a)

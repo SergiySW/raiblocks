@@ -3147,6 +3147,86 @@ rai::process_return rai::ledger::process (MDB_txn * transaction_a, rai::block co
 	return processor.result;
 }
 
+std::vector <int> rai::ledger::topological_sort (std::vector <std::shared_ptr <rai::block>> const & blocks_a, std::vector <rai::block_hash> const & hashes, std::vector <rai::block_type> const & types)
+{
+	size_t count (blocks_a.size ());
+	std::unordered_map<rai::block_hash, size_t> hash_table;
+	hash_table.reserve(count);
+	for (auto i (0); i != count; ++i)
+	{
+		hash_table.insert({hashes[i], i});
+	}
+	
+	std::vector<size_t> previous;
+	std::vector<size_t> source;
+	previous.reserve(count); source.reserve(count); 
+	for (auto i (0); i != count; ++i)
+	{
+		auto previous_it = hash_table.end();
+		auto source_it = hash_table.end();
+		switch (types[i])
+		{
+			case rai::block_type::send:
+				previous_it = hash_table.find(blocks_a[i]->previous ());
+				break;
+			case rai::block_type::receive:
+				source_it = hash_table.find(blocks_a[i]->source ());
+				previous_it = hash_table.find(blocks_a[i]->previous ());
+				break;
+			case rai::block_type::open:
+				source_it = hash_table.find(blocks_a[i]->source ());
+				break;
+			case rai::block_type::change:
+				previous_it = hash_table.find(blocks_a[i]->previous ());
+				break;
+			default:
+				assert(false);
+				break;
+		}
+		previous_it == hash_table.end() ? previous.push_back(count) : previous.push_back(previous_it->second);
+		source_it == hash_table.end() ? source.push_back(count) : source.push_back(source_it->second);
+	}
+	
+	std::stack<size_t> DFS_stack;
+	std::vector<int> vertex_level (count, -1);
+	for (auto i (0); i != count; ++i)
+	{
+		if (vertex_level[i] == -1)
+		{
+			DFS_stack.push(i);
+			while (!DFS_stack.empty())
+			{
+				auto vertex (DFS_stack.top());
+				if (vertex_level[vertex] != -1)
+				{
+					DFS_stack.pop();
+					if (previous[vertex] < count && vertex_level[vertex] <= vertex_level[previous[vertex]])
+					{
+						vertex_level[vertex] = vertex_level[previous[vertex]] + 1;
+					}
+					if (source[vertex] < count && vertex_level[vertex] <= vertex_level[source[vertex]])
+					{
+						vertex_level[vertex] = vertex_level[source[vertex]] + 1;
+					}
+				}
+				else
+				{
+					if (previous[vertex] < count)
+					{
+						DFS_stack.push(previous[vertex]);
+					}
+					if (source[vertex] < count)
+					{
+						DFS_stack.push(source[vertex]);
+					}
+					vertex_level[vertex] = 0;
+				}
+			}
+		}
+	}
+	return vertex_level;
+}
+
 std::vector <rai::process_return> rai::ledger::process_batch (MDB_txn * transaction_a, std::vector <std::shared_ptr <rai::block>> const & blocks_a)
 {
 	size_t count (blocks_a.size ());
@@ -3154,92 +3234,120 @@ std::vector <rai::process_return> rai::ledger::process_batch (MDB_txn * transact
 	std::vector <rai::block_hash> hashes (count);
 	std::vector <rai::account> accounts (count);
 	std::vector <rai::block_type> types (count);
+
 	for (auto i (0); i != count; ++i)
 	{
 		hashes[i] = blocks_a[i]->hash ();
 		types[i] = blocks_a[i]->type ();
-		switch (types[i])
-		{
-			case rai::block_type::send:
-				results[i] = ledger_process_part1 (transaction_a, static_cast <rai::send_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
-				break;
-			case rai::block_type::receive:
-				results[i] = ledger_process_part1 (transaction_a, static_cast <rai::receive_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
-				break;
-			case rai::block_type::open:
-				results[i] = ledger_process_part1 (transaction_a, static_cast <rai::open_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
-				break;
-			case rai::block_type::change:
-				results[i] = ledger_process_part1 (transaction_a, static_cast <rai::change_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
-				break;
-			default:
-				assert(false);
-				break;
-		}
 	}
-	size_t batch_count (0);
-	std::vector <rai::public_key> public_keys;
-	std::vector <rai::uint256_union> messages;
-	std::vector <rai::uint512_union> signatures;
+	auto block_levels (topological_sort(blocks_a, hashes, types));
+	size_t max_level (0);
+	std::vector<size_t> layer_sizes (count);
 	for (auto i (0); i != count; ++i)
 	{
-		if (results[i].code == rai::process_result::progress)
+		layer_sizes[block_levels[i]] += 1;
+		if (block_levels[i] > max_level)
 		{
-			public_keys.push_back (accounts[i]);
-			messages.push_back (hashes[i]);
+			max_level = block_levels[i];
+		}
+	}
+	std::vector<std::vector<size_t>> layers (max_level + 1);
+	for (auto level (0); level != max_level + 1; ++level)
+	{
+		layers[level].reserve(layer_sizes[level]);
+	}
+	for (auto i (0); i != count; ++i)
+	{
+		layers[block_levels[i]].push_back(i);
+	}
+	for (auto const& layer: layers)
+	{
+		for (auto const& i: layer)
+		{
 			switch (types[i])
 			{
 				case rai::block_type::send:
-					signatures.push_back (static_cast <rai::send_block const &> (*blocks_a[i].get ()).signature);
+					results[i] = ledger_process_part1 (transaction_a, static_cast <rai::send_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
 					break;
 				case rai::block_type::receive:
-					signatures.push_back (static_cast <rai::receive_block const &> (*blocks_a[i].get ()).signature);
+					results[i] = ledger_process_part1 (transaction_a, static_cast <rai::receive_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
 					break;
 				case rai::block_type::open:
-					signatures.push_back (static_cast <rai::open_block const &> (*blocks_a[i].get ()).signature);
+					results[i] = ledger_process_part1 (transaction_a, static_cast <rai::open_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
 					break;
 				case rai::block_type::change:
-					signatures.push_back (static_cast <rai::change_block const &> (*blocks_a[i].get ()).signature);
+					results[i] = ledger_process_part1 (transaction_a, static_cast <rai::change_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
 					break;
 				default:
 					assert(false);
 					break;
 			}
-			++batch_count;
 		}
-	}
-	int valid[batch_count];
-	rai::validate_messages (public_keys, messages, signatures, batch_count, valid);
-	batch_count = 0;
-	for (auto i (0); i != count; ++i)
-	{
-		if (results[i].code == rai::process_result::progress)
+		
+		size_t batch_count (0);
+		std::vector <rai::public_key> public_keys;
+		std::vector <rai::uint256_union> messages;
+		std::vector <rai::uint512_union> signatures;
+		for (auto const& i: layer)
 		{
-			results[i].code = valid[batch_count] != 1 ? rai::process_result::bad_signature : rai::process_result::progress; // Is the signature valid (Malformed)
-			++batch_count;
-		}
-	}
-	for (auto i (0); i != count; ++i)
-	{
-		if (results[i].code == rai::process_result::progress)
-		{
-			switch (types[i])
+			if (results[i].code == rai::process_result::progress)
 			{
-				case rai::block_type::send:
-					results[i] = ledger_process_part2 (transaction_a, static_cast <rai::send_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
-					break;
-				case rai::block_type::receive:
-					results[i] = ledger_process_part2 (transaction_a, static_cast <rai::receive_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
-					break;
-				case rai::block_type::open:
-					results[i] = ledger_process_part2 (transaction_a, static_cast <rai::open_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
-					break;
-				case rai::block_type::change:
-					results[i] = ledger_process_part2 (transaction_a, static_cast <rai::change_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
-					break;
-				default:
-					assert(false);
-					break;
+				public_keys.push_back (accounts[i]);
+				messages.push_back (hashes[i]);
+				switch (types[i])
+				{
+					case rai::block_type::send:
+						signatures.push_back (static_cast <rai::send_block const &> (*blocks_a[i].get ()).signature);
+						break;
+					case rai::block_type::receive:
+						signatures.push_back (static_cast <rai::receive_block const &> (*blocks_a[i].get ()).signature);
+						break;
+					case rai::block_type::open:
+						signatures.push_back (static_cast <rai::open_block const &> (*blocks_a[i].get ()).signature);
+						break;
+					case rai::block_type::change:
+						signatures.push_back (static_cast <rai::change_block const &> (*blocks_a[i].get ()).signature);
+						break;
+					default:
+						assert(false);
+						break;
+				}
+				++batch_count;
+			}
+		}
+		int valid[batch_count];
+		rai::validate_messages (public_keys, messages, signatures, batch_count, valid);
+		batch_count = 0;
+		for (auto const& i: layer)
+		{
+			if (results[i].code == rai::process_result::progress)
+			{
+				if (valid[batch_count] != 1)
+				{
+					results[i].code = rai::process_result::bad_signature; // Is the signature valid (Malformed)
+				}
+				else
+				{
+					switch (types[i])
+					{
+						case rai::block_type::send:
+							results[i] = ledger_process_part2 (transaction_a, static_cast <rai::send_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
+							break;
+						case rai::block_type::receive:
+							results[i] = ledger_process_part2 (transaction_a, static_cast <rai::receive_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
+							break;
+						case rai::block_type::open:
+							results[i] = ledger_process_part2 (transaction_a, static_cast <rai::open_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
+							break;
+						case rai::block_type::change:
+							results[i] = ledger_process_part2 (transaction_a, static_cast <rai::change_block const &> (*blocks_a[i].get ()), hashes[i], accounts[i]);
+							break;
+						default:
+							assert(false);
+							break;
+					}
+				}
+				++batch_count;
 			}
 		}
 	}
@@ -3335,7 +3443,7 @@ rai::process_return rai::ledger::ledger_process_part1 (MDB_txn * transaction_a, 
 		result.code = store.block_exists (transaction_a, block_a.hashables.source) ? rai::process_result::progress: rai::process_result::gap_source; // Have we seen the source block already? (Harmless)
 		if (result.code == rai::process_result::progress)
 		{
-			auto account_a (store.frontier_get (transaction_a, block_a.hashables.previous));
+			account_a = store.frontier_get (transaction_a, block_a.hashables.previous);
 			result.code = account_a.is_zero () ? rai::process_result::gap_previous : rai::process_result::progress;  //Have we seen the previous block? No entries for account at all (Harmless)
 			if (result.code != rai::process_result::progress)
 			{
