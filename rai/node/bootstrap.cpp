@@ -278,7 +278,7 @@ void rai::frontier_req_client::received_frontier (boost::system::error_code cons
 			while (!current.is_zero () && current < account)
 			{
 				// We know about an account they don't.
-				rai::transaction transaction (connection->node->store.environment, nullptr, true);
+				rai::transaction transaction (connection->node->store.environment, nullptr, false);
 				unsynced (transaction, info.head, 0);
 				next (transaction);
 			}
@@ -286,7 +286,7 @@ void rai::frontier_req_client::received_frontier (boost::system::error_code cons
 			{
 				if (account == current)
 				{
-					rai::transaction transaction (connection->node->store.environment, nullptr, true);
+					rai::transaction transaction (connection->node->store.environment, nullptr, false);
 					if (latest == info.head)
 					{
 						// In sync
@@ -323,7 +323,7 @@ void rai::frontier_req_client::received_frontier (boost::system::error_code cons
 		else
 		{
 			{
-				rai::transaction transaction (connection->node->store.environment, nullptr, true);
+				rai::transaction transaction (connection->node->store.environment, nullptr, false);
 				while (!current.is_zero ())
 				{
 					// We know about an account they don't.
