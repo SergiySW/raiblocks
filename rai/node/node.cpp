@@ -264,6 +264,11 @@ void rai::network::republish_vote (std::shared_ptr<rai::vote> vote_a)
 void rai::network::broadcast_confirm_req (std::shared_ptr<rai::block> block_a)
 {
 	auto list (std::make_shared<std::vector<rai::peer_information>> (node.peers.representatives (std::numeric_limits<size_t>::max ())));
+	if (list->empty () || node.online_reps.online_stake () == node.config.online_weight_minimum.number ())
+	{
+		// broadcast request to all peers
+		list = std::make_shared<std::vector<rai::peer_information>> (node.peers.list_vector ());
+	}
 	broadcast_confirm_req_base (block_a, list, 0);
 }
 
@@ -1985,6 +1990,18 @@ std::map<rai::endpoint, unsigned> rai::peer_container::list_version ()
 	return result;
 }
 
+std::vector<rai::peer_information> rai::peer_container::list_vector ()
+{
+	std::vector<peer_information> result;
+	std::lock_guard<std::mutex> lock (mutex);
+	for (auto i (peers.begin ()), j (peers.end ()); i != j; ++i)
+	{
+		result.push_back (*i);
+	}
+	std::random_shuffle (result.begin (), result.end ());
+	return result;
+}
+
 rai::endpoint rai::peer_container::bootstrap_peer ()
 {
 	rai::endpoint result (boost::asio::ip::address_v6::any (), 0);
@@ -3526,11 +3543,12 @@ void rai::active_transactions::announce_votes ()
 			if (i->announcements % announcement_min == 2)
 			{
 				auto reps (std::make_shared<std::vector<rai::peer_information>> (node.peers.representatives (std::numeric_limits<size_t>::max ())));
-
+				rai::uint128_t total_weight (0);
 				for (auto j (reps->begin ()), m (reps->end ()); j != m;)
 				{
 					auto & rep_votes (i->election->votes.rep_votes);
 					auto rep_acct (j->probable_rep_account);
+					total_weight = total_weight + j->rep_weight.number ();
 					if (rep_votes.find (rep_acct) != rep_votes.end ())
 					{
 						std::swap (*j, reps->back ());
@@ -3546,7 +3564,7 @@ void rai::active_transactions::announce_votes ()
 						}
 					}
 				}
-				if (!reps->empty ())
+				if (!reps->empty () && total_weight > node.config.online_weight_minimum.number ())
 				{
 					// broadcast_confirm_req_base modifies reps, so we clone it once to avoid aliasing
 					node.network.broadcast_confirm_req_base (i->confirm_req_options.first, std::make_shared<std::vector<rai::peer_information>> (*reps), 0);
@@ -3554,6 +3572,11 @@ void rai::active_transactions::announce_votes ()
 					{
 						node.network.broadcast_confirm_req_base (i->confirm_req_options.second, reps, 0);
 					}
+				}
+				else
+				{
+					// broadcast request to all peers
+					node.network.broadcast_confirm_req_base (i->confirm_req_options.first, std::make_shared<std::vector<rai::peer_information>> (node.peers.list_vector ()), 0);
 				}
 			}
 		}
