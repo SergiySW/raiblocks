@@ -3559,7 +3559,7 @@ void rai::active_transactions::announce_votes ()
 				unconfirmed_announcements += i->announcements;
 			}
 			node.background ([election_l]() { election_l->broadcast_winner (); });
-			if (i->announcements % announcement_min == 2)
+			if (i->announcements % announcement_min == 1)
 			{
 				auto reps (std::make_shared<std::vector<rai::peer_information>> (node.peers.representatives (std::numeric_limits<size_t>::max ())));
 				rai::uint128_t total_weight (0);

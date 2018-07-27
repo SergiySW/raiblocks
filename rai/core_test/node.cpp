@@ -242,7 +242,7 @@ TEST (node, auto_bootstrap)
 	{
 		system.poll ();
 		++iterations3;
-		ASSERT_LT (iterations3, 200);
+		ASSERT_LT (iterations3, 400);
 	}
 	auto iterations4 (0);
 	while (node1->bootstrap_initiator.in_progress ())
