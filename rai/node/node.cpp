@@ -1286,6 +1286,7 @@ bool rai::rep_crawler::exists (rai::block_hash const & hash_a)
 rai::block_processor::block_processor (rai::node & node_a) :
 stopped (false),
 active (false),
+flush (false),
 node (node_a),
 next_log (std::chrono::steady_clock::now ())
 {
@@ -1306,10 +1307,12 @@ void rai::block_processor::stop ()
 void rai::block_processor::flush ()
 {
 	std::unique_lock<std::mutex> lock (mutex);
+	flush = true;
 	while (!stopped && (!blocks.empty () || active))
 	{
 		condition.wait (lock);
 	}
+	flush = false;
 }
 
 bool rai::block_processor::full ()
@@ -1318,10 +1321,10 @@ bool rai::block_processor::full ()
 	return blocks.size () > 65536;
 }
 
-bool rai::block_processor::half_full ()
+bool rai::block_processor::udp_full ()
 {
 	std::unique_lock<std::mutex> lock (mutex);
-	return blocks.size () > 32768;
+	return flush || blocks.size () > 32768;
 }
 
 void rai::block_processor::add (std::shared_ptr<rai::block> block_a, std::chrono::steady_clock::time_point origination)
@@ -1954,7 +1957,7 @@ void rai::network::confirm_send (rai::confirm_ack const & confirm_a, std::shared
 
 void rai::node::process_active (std::shared_ptr<rai::block> incoming)
 {
-	if (!block_processor.half_full () && !block_arrival.add (incoming->hash ()))
+	if (!block_processor.udp_full () && !block_arrival.add (incoming->hash ()))
 	{
 		block_processor.add (incoming, std::chrono::steady_clock::now ());
 	}
