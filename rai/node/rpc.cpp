@@ -1633,6 +1633,16 @@ void rai::rpc_handler::confirmation_info ()
 	}
 }
 
+void rai::rpc_handler::confirmation_quorum ()
+{
+	boost::property_tree::ptree response_l;
+	response_l.put ("quorum_delta", node.delta ().convert_to<std::string> ());
+	response_l.put ("online_weight_quorum_percent", std::to_string (node.config.online_weight_quorum));
+	response_l.put ("online_weight_minimum", node.config.online_weight_minimum.to_string_dec ());
+	response_l.put ("online_stake_total", node.online_reps.online_stake_total.convert_to<std::string> ());
+	response (response_l);
+}
+
 void rai::rpc_handler::delegators ()
 {
 	std::string account_text (request.get<std::string> ("account"));
@@ -4840,6 +4850,10 @@ void rai::rpc_handler::process_request ()
 		else if (action == "confirmation_info")
 		{
 			confirmation_info ();
+		}
+		else if (action == "confirmation_quorum")
+		{
+			confirmation_quorum ();
 		}
 		else if (action == "frontiers")
 		{
