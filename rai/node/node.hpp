@@ -543,7 +543,7 @@ private:
 	void process_receive_many (std::unique_lock<std::mutex> &);
 	bool stopped;
 	bool active;
-	bool flush;
+	bool flushing;
 	std::chrono::steady_clock::time_point next_log;
 	std::deque<std::pair<std::shared_ptr<rai::block>, std::chrono::steady_clock::time_point>> blocks;
 	std::unordered_set<rai::block_hash> blocks_hashes;
