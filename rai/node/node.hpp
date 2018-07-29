@@ -529,12 +529,14 @@ public:
 	void stop ();
 	void flush ();
 	bool full ();
+	bool half_full ();
 	void add (std::shared_ptr<rai::block>, std::chrono::steady_clock::time_point);
 	void force (std::shared_ptr<rai::block>);
 	bool should_log ();
 	bool have_blocks ();
 	void process_blocks ();
 	rai::process_return process_receive_one (MDB_txn *, std::shared_ptr<rai::block>, std::chrono::steady_clock::time_point = std::chrono::steady_clock::now ());
+	std::mutex mutex;
 
 private:
 	void queue_unchecked (MDB_txn *, rai::block_hash const &);
@@ -547,7 +549,6 @@ private:
 	std::deque<std::shared_ptr<rai::block>> forced;
 	std::condition_variable condition;
 	rai::node & node;
-	std::mutex mutex;
 };
 class node : public std::enable_shared_from_this<rai::node>
 {
@@ -570,6 +571,7 @@ public:
 	void process_confirmed (std::shared_ptr<rai::block>);
 	void process_message (rai::message &, rai::endpoint const &);
 	void process_active (std::shared_ptr<rai::block>);
+	bool process_local (std::shared_ptr<rai::block>);
 	rai::process_return process (rai::block const &);
 	void keepalive_preconfigured (std::vector<std::string> const &);
 	rai::block_hash latest (rai::account const &);

@@ -900,8 +900,7 @@ std::shared_ptr<rai::block> rai::wallet::receive_action (rai::block const & send
 		{
 			node.work_generate_blocking (*block);
 		}
-		node.process_active (block);
-		node.block_processor.flush ();
+		node.process_local (block);
 		if (generate_work_a)
 		{
 			work_ensure (account, block->hash ());
@@ -938,8 +937,7 @@ std::shared_ptr<rai::block> rai::wallet::change_action (rai::account const & sou
 		{
 			node.work_generate_blocking (*block);
 		}
-		node.process_active (block);
-		node.block_processor.flush ();
+		node.process_local (block);
 		if (generate_work_a)
 		{
 			work_ensure (source_a, block->hash ());
@@ -1020,8 +1018,7 @@ std::shared_ptr<rai::block> rai::wallet::send_action (rai::account const & sourc
 		{
 			node.work_generate_blocking (*block);
 		}
-		node.process_active (block);
-		node.block_processor.flush ();
+		node.process_local (block);
 		if (generate_work_a)
 		{
 			work_ensure (source_a, block->hash ());
