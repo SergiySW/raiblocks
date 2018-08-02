@@ -601,13 +601,15 @@ TEST (system, generate_send_existing)
 		++iterations;
 		ASSERT_LT (iterations, 300);
 		rai::transaction transaction (system.wallet (0)->store.environment, nullptr, false);
-		ASSERT_FALSE (system.nodes[0]->store.account_get (transaction, rai::test_genesis_key.pub, info2));
+		rai::transaction block_transaction (system.nodes[0]->store.environment, nullptr, false);
+		ASSERT_FALSE (system.nodes[0]->store.account_get (block_transaction, rai::test_genesis_key.pub, info2));
 	}
 	ASSERT_EQ (info1.block_count + 2, info2.block_count);
 	ASSERT_EQ (info2.balance, rai::genesis_amount / 3);
 	{
 		rai::transaction transaction (system.wallet (0)->store.environment, nullptr, false);
-		ASSERT_NE (system.nodes[0]->ledger.amount (transaction, info2.head), 0);
+		rai::transaction block_transaction (system.nodes[0]->store.environment, nullptr, false);
+		ASSERT_NE (system.nodes[0]->ledger.amount (block_transaction, info2.head), 0);
 	}
 	system.stop ();
 	runner.join ();
