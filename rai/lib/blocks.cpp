@@ -1132,7 +1132,7 @@ std::unique_ptr<rai::block> rai::deserialize_block_json (boost::property_tree::p
 		auto type (tree_a.get<std::string> ("type"));
 		if (type == "receive")
 		{
-			bool error;
+			bool error (false);
 			std::unique_ptr<rai::receive_block> obj (new rai::receive_block (error, tree_a));
 			if (!error)
 			{
@@ -1141,7 +1141,7 @@ std::unique_ptr<rai::block> rai::deserialize_block_json (boost::property_tree::p
 		}
 		else if (type == "send")
 		{
-			bool error;
+			bool error (false);
 			std::unique_ptr<rai::send_block> obj (new rai::send_block (error, tree_a));
 			if (!error)
 			{
@@ -1150,7 +1150,7 @@ std::unique_ptr<rai::block> rai::deserialize_block_json (boost::property_tree::p
 		}
 		else if (type == "open")
 		{
-			bool error;
+			bool error (false);
 			std::unique_ptr<rai::open_block> obj (new rai::open_block (error, tree_a));
 			if (!error)
 			{
@@ -1159,7 +1159,7 @@ std::unique_ptr<rai::block> rai::deserialize_block_json (boost::property_tree::p
 		}
 		else if (type == "change")
 		{
-			bool error;
+			bool error (false);
 			std::unique_ptr<rai::change_block> obj (new rai::change_block (error, tree_a));
 			if (!error)
 			{
@@ -1168,7 +1168,7 @@ std::unique_ptr<rai::block> rai::deserialize_block_json (boost::property_tree::p
 		}
 		else if (type == "state")
 		{
-			bool error;
+			bool error (false);
 			std::unique_ptr<rai::state_block> obj (new rai::state_block (error, tree_a));
 			if (!error)
 			{
@@ -1201,7 +1201,7 @@ std::unique_ptr<rai::block> rai::deserialize_block (rai::stream & stream_a, rai:
 	{
 		case rai::block_type::receive:
 		{
-			bool error;
+			bool error (false);
 			std::unique_ptr<rai::receive_block> obj (new rai::receive_block (error, stream_a));
 			if (!error)
 			{
@@ -1211,7 +1211,7 @@ std::unique_ptr<rai::block> rai::deserialize_block (rai::stream & stream_a, rai:
 		}
 		case rai::block_type::send:
 		{
-			bool error;
+			bool error (false);
 			std::unique_ptr<rai::send_block> obj (new rai::send_block (error, stream_a));
 			if (!error)
 			{
@@ -1221,7 +1221,7 @@ std::unique_ptr<rai::block> rai::deserialize_block (rai::stream & stream_a, rai:
 		}
 		case rai::block_type::open:
 		{
-			bool error;
+			bool error (false);
 			std::unique_ptr<rai::open_block> obj (new rai::open_block (error, stream_a));
 			if (!error)
 			{
@@ -1231,7 +1231,7 @@ std::unique_ptr<rai::block> rai::deserialize_block (rai::stream & stream_a, rai:
 		}
 		case rai::block_type::change:
 		{
-			bool error;
+			bool error (false);
 			std::unique_ptr<rai::change_block> obj (new rai::change_block (error, stream_a));
 			if (!error)
 			{
@@ -1241,7 +1241,7 @@ std::unique_ptr<rai::block> rai::deserialize_block (rai::stream & stream_a, rai:
 		}
 		case rai::block_type::state:
 		{
-			bool error;
+			bool error (false);
 			std::unique_ptr<rai::state_block> obj (new rai::state_block (error, stream_a));
 			if (!error)
 			{

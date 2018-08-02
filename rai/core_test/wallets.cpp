@@ -71,12 +71,14 @@ TEST (wallets, remove)
 	}
 }
 
+// Keeps breaking whenever we add new DBs
 TEST (wallets, wallet_create_max)
 {
 	rai::system system (24000, 1);
 	bool error (false);
 	rai::wallets wallets (error, *system.nodes[0]);
-	for (int i = 0; i < system.nodes[0]->config.lmdb_max_dbs - 1; i++)
+	const int nonWalletDbs = 19;
+	for (int i = 0; i < system.nodes[0]->config.lmdb_max_dbs - nonWalletDbs; i++)
 	{
 		rai::keypair key;
 		auto wallet = wallets.create (key.pub);

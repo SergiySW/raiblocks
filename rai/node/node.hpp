@@ -1,10 +1,10 @@
 #pragma once
 
-#include <rai/ledger.hpp>
 #include <rai/lib/work.hpp>
 #include <rai/node/bootstrap.hpp>
 #include <rai/node/stats.hpp>
 #include <rai/node/wallet.hpp>
+#include <rai/secure/ledger.hpp>
 
 #include <condition_variable>
 #include <memory>
@@ -219,6 +219,7 @@ public:
 	// List of all peers
 	std::deque<rai::endpoint> list ();
 	std::map<rai::endpoint, unsigned> list_version ();
+	std::vector<peer_information> list_vector ();
 	// A list of random peers sized for the configured rebroadcast fanout
 	std::deque<rai::endpoint> list_fanout ();
 	// Get the next peer for attempting bootstrap
@@ -483,8 +484,8 @@ public:
 	std::string callback_target;
 	int lmdb_max_dbs;
 	rai::stat_config stat_config;
-	rai::block_hash state_block_parse_canary;
-	rai::block_hash state_block_generate_canary;
+	rai::uint256_union epoch_block_link;
+	rai::account epoch_block_signer;
 	static std::chrono::seconds constexpr keepalive_period = std::chrono::seconds (60);
 	static std::chrono::seconds constexpr keepalive_cutoff = keepalive_period * 5;
 	static std::chrono::minutes constexpr wallet_backup_interval = std::chrono::minutes (5);
@@ -631,8 +632,6 @@ public:
 	void join ();
 	std::vector<std::thread> threads;
 };
-void add_node_options (boost::program_options::options_description &);
-bool handle_node_options (boost::program_options::variables_map &);
 class inactive_node
 {
 public:

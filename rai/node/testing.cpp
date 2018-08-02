@@ -166,7 +166,7 @@ void rai::system::generate_receive (rai::node & node_a)
 		if (i != node_a.store.pending_end ())
 		{
 			rai::pending_key send_hash (i->first);
-			rai::pending_info info (i->second);
+			rai::pending_info info (i->second, i->from_secondary_store ? rai::epoch::epoch_1 : rai::epoch::epoch_0);
 			send_block = node_a.store.block_get (transaction, send_hash.hash);
 		}
 	}
@@ -311,7 +311,7 @@ void rai::system::generate_mass_activity (uint32_t count_a, rai::node & node_a)
 				rai::transaction transaction (node_a.store.environment, nullptr, false);
 				auto block_counts (node_a.store.block_count (transaction));
 				count = block_counts.sum ();
-				state = block_counts.state;
+				state = block_counts.state_v0 + block_counts.state_v1;
 			}
 			std::cerr << boost::str (boost::format ("Mass activity iteration %1% us %2% us/t %3% state: %4% old: %5%\n") % i % us % (us / 256) % state % (count - state));
 			previous = now;
