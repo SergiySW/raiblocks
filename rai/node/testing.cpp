@@ -234,7 +234,7 @@ void rai::system::generate_send_existing (rai::node & node_a, std::vector<rai::a
 		random_pool.GenerateBlock (account.bytes.data (), sizeof (account.bytes));
 		rai::transaction transaction (node_a.wallets_store.environment, nullptr, false);
 		rai::transaction block_transaction (node_a.store.environment, nullptr, false);
-		rai::store_iterator entry (node_a.store.latest_begin (block_transaction, account));
+		rai::store_merge_iterator entry (node_a.store.latest_begin (block_transaction, account));
 		if (entry == node_a.store.latest_end ())
 		{
 			entry = node_a.store.latest_begin (block_transaction);
