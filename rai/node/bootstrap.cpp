@@ -1107,6 +1107,10 @@ void rai::bootstrap_attempt::requeue_pull (rai::pull_info const & pull_a)
 				BOOST_LOG (node->log) << boost::str (boost::format ("Requesting pull account %1% from frontier peer after %2% attempts") % pull.account.to_account () % pull.attempts);
 			}
 		}
+		else if (node->config.logging.bulk_pull_logging ())
+		{
+			BOOST_LOG (node->log) << boost::str (boost::format ("Failed to pull account %1% down to %2% after %3% attempts") % pull.account.to_account () % pull.end.to_string () % pull.attempts);
+		}
 	}
 	else
 	{
