@@ -2413,37 +2413,6 @@ void rai::bootstrap_lazy::add_pull (rai::pull_info const & pull)
 	condition.notify_all ();
 }
 
-void rai::bootstrap_lazy::add_start_block (std::shared_ptr<rai::block> block_a)
-{
-	auto hash (block_a->hash ());
-	// Start only for unknown blocks
-	if (processed_blocks.find (hash) == processed_blocks.end ())
-	{
-		// Attempt to find account from block
-		rai::account account (block_a->account ());
-		// If block countains account
-		if (!account.is_zero ())
-		{
-			auto transaction (node.store.tx_begin_read ());
-			rai::account_info info;
-			// If acccount found in local ledger
-			if (!node.store.account_get (transaction, account, info))
-			{
-				//connection->attempt->add_pull (rai::pull_info (account, hash, info.head));
-			}
-			// Account not found in local ledger
-			else
-			{
-				//connection->attempt->add_pull (rai::pull_info (account, hash, rai::block_hash (0)));
-			}
-		}
-		// Block account is unknown
-		{
-			//connection->attempt->add_pull (rai::pull_info (hash, hash, rai::block_hash (0)));
-		}
-	}
-}
-
 void rai::bootstrap_lazy::add_start_hash (rai::block_hash const & hash_a)
 {
 	// Start only for unknown blocks
@@ -2462,7 +2431,9 @@ void rai::bootstrap_lazy::process_block (std::shared_ptr<rai::block> block_a)
 		// Search block in ledger (old)
 		if (node.block (hash) == nullptr)
 		{
+			std::lock_guard<std::mutex> lock (mutex);
 			processed_blocks.insert (hash);
+			lock.unlock ();
 			node.block_processor.add (block_a, std::chrono::steady_clock::time_point ());
 			// Search for new dependencies
 			if (block_a->source ().is_zero ())

@@ -318,12 +318,15 @@ public:
 	bootstrap_lazy (rai::node & node_a, int thread_count);
 	~bootstrap_lazy ();
 	void add_confirmed_block (std::shared_ptr<rai::block> block_a, rai::account const & account_a, rai::amount const & amount_a);
-	void add_start_block (std::shared_ptr<rai::block>);
+	void requeue_pull (rai::pull_info const &);
+	void add_pull (rai::pull_info const &);
 	void add_start_hash (rai::block_hash const & hash_a);
 	void process_block (std::shared_ptr<rai::block>);
 private:
-	std::unordered_set <std::shared_ptr<rai::block>> processed_blocks;
 	rai::node & node;
 	void start_thread (void);
+	std::unordered_set <rai::block_hash> processed_blocks;
+	std::deque<rai::pull_info> pulls;
+	std::mutex mutex;
 };
 }
