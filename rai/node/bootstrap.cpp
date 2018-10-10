@@ -2406,6 +2406,88 @@ void rai::bootstrap_lazy::add_confirmed_block (std::shared_ptr<rai::block> block
 	return;
 }
 
+void rai::bootstrap_lazy::add_pull (rai::pull_info const & pull)
+{
+	std::lock_guard<std::mutex> lock (mutex);
+	pulls.push_back (pull);
+	condition.notify_all ();
+}
+
+void rai::bootstrap_lazy::add_start_block (std::shared_ptr<rai::block> block_a)
+{
+	auto hash (block_a->hash ());
+	// Start only for unknown blocks
+	if (processed_blocks.find (hash) == processed_blocks.end ())
+	{
+		// Attempt to find account from block
+		rai::account account (block_a->account ());
+		// If block countains account
+		if (!account.is_zero ())
+		{
+			auto transaction (node.store.tx_begin_read ());
+			rai::account_info info;
+			// If acccount found in local ledger
+			if (!node.store.account_get (transaction, account, info))
+			{
+				//connection->attempt->add_pull (rai::pull_info (account, hash, info.head));
+			}
+			// Account not found in local ledger
+			else
+			{
+				//connection->attempt->add_pull (rai::pull_info (account, hash, rai::block_hash (0)));
+			}
+		}
+		// Block account is unknown
+		{
+			//connection->attempt->add_pull (rai::pull_info (hash, hash, rai::block_hash (0)));
+		}
+	}
+}
+
+void rai::bootstrap_lazy::add_start_hash (rai::block_hash const & hash_a)
+{
+	// Start only for unknown blocks
+	if (processed_blocks.find (hash_a) == processed_blocks.end ())
+	{
+		add_pull (rai::pull_info (hash, hash, rai::block_hash (0)));
+	}
+}
+
+void rai::bootstrap_lazy::process_block (std::shared_ptr<rai::block> block_a)
+{
+	auto hash (block_a->hash ());
+	// Processing new blocks
+	if (processed_blocks.find (hash) == processed_blocks.end ())
+	{
+		// Search block in ledger (old)
+		if (node.block (hash) == nullptr)
+		{
+			processed_blocks.insert (hash);
+			node.block_processor.add (block_a, std::chrono::steady_clock::time_point ());
+			// Search for new dependencies
+			if (block_a->source ().is_zero ())
+			{
+				add_start_hash (block_a->source ());
+			}
+			else if (block_a->type == rai::state_block && !block_a->link ().is_zero ())
+			{
+				//weak assumption
+				add_start_hash (block_a->link ());
+			}
+		}
+		// Drop bulk_pull if block is already known
+		else
+		{
+			// --> Drop
+		}
+	}
+	// Drop bulk_pull if block is already known
+	else
+	{
+		// ------> Drop
+	}
+}
+
 void rai::bootstrap_lazy::start_thread (void)
 {
 	return;
