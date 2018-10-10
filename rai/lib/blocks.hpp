@@ -54,6 +54,8 @@ public:
 	virtual rai::block_hash source () const = 0;
 	// Previous block or account number for open blocks
 	virtual rai::block_hash root () const = 0;
+	// Account field for state & open blocks
+	virtual rai::account account () const = 0;
 	virtual rai::account representative () const = 0;
 	virtual void serialize (rai::stream &) const = 0;
 	virtual void serialize_json (std::string &) const = 0;
@@ -90,6 +92,7 @@ public:
 	rai::block_hash previous () const override;
 	rai::block_hash source () const override;
 	rai::block_hash root () const override;
+	rai::account account () const override;
 	rai::account representative () const override;
 	void serialize (rai::stream &) const override;
 	void serialize_json (std::string &) const override;
@@ -131,6 +134,7 @@ public:
 	rai::block_hash previous () const override;
 	rai::block_hash source () const override;
 	rai::block_hash root () const override;
+	rai::account account () const override;
 	rai::account representative () const override;
 	void serialize (rai::stream &) const override;
 	void serialize_json (std::string &) const override;
@@ -174,6 +178,7 @@ public:
 	rai::block_hash previous () const override;
 	rai::block_hash source () const override;
 	rai::block_hash root () const override;
+	rai::account account () const override;
 	rai::account representative () const override;
 	void serialize (rai::stream &) const override;
 	void serialize_json (std::string &) const override;
@@ -215,6 +220,7 @@ public:
 	rai::block_hash previous () const override;
 	rai::block_hash source () const override;
 	rai::block_hash root () const override;
+	rai::account account () const override;
 	rai::account representative () const override;
 	void serialize (rai::stream &) const override;
 	void serialize_json (std::string &) const override;
