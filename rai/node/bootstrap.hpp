@@ -312,21 +312,16 @@ public:
 	std::shared_ptr<std::vector<uint8_t>> send_buffer;
 	size_t count;
 };
-class bootstrap_lazy
+
+class bootstrap_lazy : public bootstrap_attempt
 {
 public:
-	bootstrap_lazy (rai::node & node_a, int thread_count);
-	~bootstrap_lazy ();
-	void add_confirmed_block (std::shared_ptr<rai::block> block_a, rai::account const & account_a, rai::amount const & amount_a);
-	void requeue_pull (rai::pull_info const &);
-	void add_pull (rai::pull_info const &);
-	void add_start_hash (rai::block_hash const & hash_a);
-	void process_block (std::shared_ptr<rai::block>);
+	bootstrap_lazy (std::shared_ptr<rai::node> node_a) override;
+	~bootstrap_lazy () override;
+	void run () override;
+	void add_hash (rai::block_hash const & hash_a);
+	bool process_block (std::shared_ptr<rai::block>);
 private:
-	rai::node & node;
-	void start_thread (void);
 	std::unordered_set <rai::block_hash> processed_blocks;
-	std::deque<rai::pull_info> pulls;
-	std::mutex mutex;
 };
 }

@@ -2386,34 +2386,67 @@ void rai::frontier_req_server::next ()
 /*
  * Lazy Bootstrapping Client
  */
-rai::bootstrap_lazy::bootstrap_lazy (rai::node & node_a, int thread_count) :
-node (node_a)
+rai::bootstrap_lazy::bootstrap_lazy (std::shared_ptr<rai::node> node_a) :
+next_log (std::chrono::steady_clock::now ()),
+connections (0),
+pulling (0),
+node (node_a),
+account_count (0),
+total_blocks (0),
+stopped (false)
 {
-	int thread_number;
-
-	
-
-	return;
+	BOOST_LOG (node->log) << "Starting lazy bootstrap attempt";
+	node->bootstrap_initiator.notify_listeners (true);
 }
 
 rai::bootstrap_lazy::~bootstrap_lazy ()
 {
-	return;
+	BOOST_LOG (node->log) << "Exiting lazy bootstrap attempt";
+	node->bootstrap_initiator.notify_listeners (false);
 }
 
-void rai::bootstrap_lazy::add_confirmed_block (std::shared_ptr<rai::block> block_a, rai::account const & account_a, rai::amount const & amount_a)
+void rai::bootstrap_attempt::run ()
 {
-	return;
-}
-
-void rai::bootstrap_lazy::add_pull (rai::pull_info const & pull)
-{
-	std::lock_guard<std::mutex> lock (mutex);
-	pulls.push_back (pull);
+	populate_connections ();
+	std::unique_lock<std::mutex> lock (mutex);
+	while (still_pulling ())
+	{
+		while (still_pulling ())
+		{
+			if (!pulls.empty ())
+			{
+				if (!node->block_processor.full ())
+				{
+					request_pull (lock);
+				}
+				else
+				{
+					condition.wait_for (lock, std::chrono::seconds (15));
+				}
+			}
+			else
+			{
+				condition.wait (lock);
+			}
+		}
+		// Flushing may resolve forks which can add more pulls
+		BOOST_LOG (node->log) << "Flushing unchecked blocks";
+		lock.unlock ();
+		node->block_processor.flush ();
+		lock.lock ();
+		BOOST_LOG (node->log) << "Finished flushing unchecked blocks";
+	}
+	if (!stopped)
+	{
+		BOOST_LOG (node->log) << "Completed pulls";
+	}
+	request_push (lock);
+	stopped = true;
 	condition.notify_all ();
+	idle.clear ();
 }
 
-void rai::bootstrap_lazy::add_start_hash (rai::block_hash const & hash_a)
+void rai::bootstrap_lazy::add_hash (rai::block_hash const & hash_a)
 {
 	// Start only for unknown blocks
 	if (processed_blocks.find (hash_a) == processed_blocks.end ())
@@ -2422,8 +2455,9 @@ void rai::bootstrap_lazy::add_start_hash (rai::block_hash const & hash_a)
 	}
 }
 
-void rai::bootstrap_lazy::process_block (std::shared_ptr<rai::block> block_a)
+bool rai::bootstrap_lazy::process_block (std::shared_ptr<rai::block> block_a)
 {
+	bool stop_pull (false);
 	auto hash (block_a->hash ());
 	// Processing new blocks
 	if (processed_blocks.find (hash) == processed_blocks.end ())
@@ -2438,28 +2472,24 @@ void rai::bootstrap_lazy::process_block (std::shared_ptr<rai::block> block_a)
 			// Search for new dependencies
 			if (block_a->source ().is_zero ())
 			{
-				add_start_hash (block_a->source ());
+				add_hash (block_a->source ());
 			}
 			else if (block_a->type == rai::state_block && !block_a->link ().is_zero ())
 			{
 				//weak assumption
-				add_start_hash (block_a->link ());
+				add_hash (block_a->link ());
 			}
 		}
 		// Drop bulk_pull if block is already known
 		else
 		{
-			// --> Drop
+			stop_pull = true;
 		}
 	}
 	// Drop bulk_pull if block is already known
 	else
 	{
-		// ------> Drop
+		stop_pull = true;
 	}
-}
-
-void rai::bootstrap_lazy::start_thread (void)
-{
-	return;
+	return stop_pull;
 }
