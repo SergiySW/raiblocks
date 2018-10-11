@@ -316,6 +316,11 @@ rai::block_hash rai::send_block::source () const
 	return 0;
 }
 
+rai::block_hash rai::send_block::link () const
+{
+	return 0;
+}
+
 rai::block_hash rai::send_block::root () const
 {
 	return hashables.previous;
@@ -575,6 +580,11 @@ rai::block_hash rai::open_block::source () const
 	return hashables.source;
 }
 
+rai::block_hash rai::open_block::link () const
+{
+	return 0;
+}
+
 rai::block_hash rai::open_block::root () const
 {
 	return hashables.account;
@@ -812,6 +822,11 @@ bool rai::change_block::valid_predecessor (rai::block const & block_a) const
 }
 
 rai::block_hash rai::change_block::source () const
+{
+	return 0;
+}
+
+rai::block_hash rai::change_block::link () const
 {
 	return 0;
 }
@@ -1118,6 +1133,11 @@ bool rai::state_block::valid_predecessor (rai::block const & block_a) const
 rai::block_hash rai::state_block::source () const
 {
 	return 0;
+}
+
+rai::block_hash rai::state_block::link () const
+{
+	return hashables.link;
 }
 
 rai::block_hash rai::state_block::root () const
@@ -1453,6 +1473,11 @@ rai::block_hash rai::receive_block::previous () const
 rai::block_hash rai::receive_block::source () const
 {
 	return hashables.source;
+}
+
+rai::block_hash rai::receive_block::link () const
+{
+	return 0;
 }
 
 rai::block_hash rai::receive_block::root () const

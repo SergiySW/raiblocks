@@ -54,6 +54,8 @@ public:
 	virtual rai::block_hash source () const = 0;
 	// Previous block or account number for open blocks
 	virtual rai::block_hash root () const = 0;
+	// Link field for state blocks
+	virtual rai::block_hash link () const  = 0;
 	// Account field for state & open blocks
 	virtual rai::account account () const = 0;
 	virtual rai::account representative () const = 0;
@@ -92,6 +94,7 @@ public:
 	rai::block_hash previous () const override;
 	rai::block_hash source () const override;
 	rai::block_hash root () const override;
+	rai::block_hash link () const override;
 	rai::account account () const override;
 	rai::account representative () const override;
 	void serialize (rai::stream &) const override;
@@ -134,6 +137,7 @@ public:
 	rai::block_hash previous () const override;
 	rai::block_hash source () const override;
 	rai::block_hash root () const override;
+	rai::block_hash link () const override;
 	rai::account account () const override;
 	rai::account representative () const override;
 	void serialize (rai::stream &) const override;
@@ -178,6 +182,7 @@ public:
 	rai::block_hash previous () const override;
 	rai::block_hash source () const override;
 	rai::block_hash root () const override;
+	rai::block_hash link () const override;
 	rai::account account () const override;
 	rai::account representative () const override;
 	void serialize (rai::stream &) const override;
@@ -219,6 +224,7 @@ public:
 	void block_work_set (uint64_t) override;
 	rai::block_hash previous () const override;
 	rai::block_hash source () const override;
+	rai::block_hash link () const override;
 	rai::block_hash root () const override;
 	rai::account account () const override;
 	rai::account representative () const override;
@@ -273,6 +279,7 @@ public:
 	void block_work_set (uint64_t) override;
 	rai::block_hash previous () const override;
 	rai::block_hash source () const override;
+	rai::block_hash link () const override;
 	rai::block_hash root () const override;
 	rai::account account () const override;
 	rai::account representative () const override;
