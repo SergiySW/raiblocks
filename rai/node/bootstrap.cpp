@@ -2386,26 +2386,8 @@ void rai::frontier_req_server::next ()
 /*
  * Lazy Bootstrapping Client
  */
-rai::bootstrap_lazy::bootstrap_lazy (std::shared_ptr<rai::node> node_a) :
-next_log (std::chrono::steady_clock::now ()),
-connections (0),
-pulling (0),
-node (node_a),
-account_count (0),
-total_blocks (0),
-stopped (false)
-{
-	BOOST_LOG (node->log) << "Starting lazy bootstrap attempt";
-	node->bootstrap_initiator.notify_listeners (true);
-}
 
-rai::bootstrap_lazy::~bootstrap_lazy ()
-{
-	BOOST_LOG (node->log) << "Exiting lazy bootstrap attempt";
-	node->bootstrap_initiator.notify_listeners (false);
-}
-
-void rai::bootstrap_attempt::run ()
+void rai::bootstrap_lazy::run_lazy ()
 {
 	populate_connections ();
 	std::unique_lock<std::mutex> lock (mutex);
@@ -2465,7 +2447,7 @@ bool rai::bootstrap_lazy::process_block (std::shared_ptr<rai::block> block_a)
 		// Search block in ledger (old)
 		if (node->block (hash) == nullptr)
 		{
-			std::lock_guard<std::mutex> lock (mutex);
+			std::unique_lock<std::mutex> lock (mutex);
 			processed_blocks.insert (hash);
 			lock.unlock ();
 			node->block_processor.add (block_a, std::chrono::steady_clock::time_point ());
@@ -2474,7 +2456,7 @@ bool rai::bootstrap_lazy::process_block (std::shared_ptr<rai::block> block_a)
 			{
 				add_hash (block_a->source ());
 			}
-			else if (block_a->type == rai::state_block && !block_a->link ().is_zero ())
+			else if (block_a->type () == rai::state_block && !block_a->link ().is_zero ())
 			{
 				//weak assumption
 				add_hash (block_a->link ());
