@@ -2463,12 +2463,12 @@ bool rai::bootstrap_lazy::process_block (std::shared_ptr<rai::block> block_a)
 	if (processed_blocks.find (hash) == processed_blocks.end ())
 	{
 		// Search block in ledger (old)
-		if (node.block (hash) == nullptr)
+		if (node->block (hash) == nullptr)
 		{
 			std::lock_guard<std::mutex> lock (mutex);
 			processed_blocks.insert (hash);
 			lock.unlock ();
-			node.block_processor.add (block_a, std::chrono::steady_clock::time_point ());
+			node->block_processor.add (block_a, std::chrono::steady_clock::time_point ());
 			// Search for new dependencies
 			if (block_a->source ().is_zero ())
 			{
