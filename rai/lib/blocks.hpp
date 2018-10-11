@@ -274,6 +274,7 @@ public:
 	rai::block_hash previous () const override;
 	rai::block_hash source () const override;
 	rai::block_hash root () const override;
+	rai::account account () const override;
 	rai::account representative () const override;
 	void serialize (rai::stream &) const override;
 	void serialize_json (std::string &) const override;
