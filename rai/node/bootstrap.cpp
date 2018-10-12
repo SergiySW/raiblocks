@@ -2433,7 +2433,7 @@ void rai::bootstrap_lazy::add_hash (rai::block_hash const & hash_a)
 	// Start only for unknown blocks
 	if (processed_blocks.find (hash_a) == processed_blocks.end ())
 	{
-		add_pull (rai::pull_info (hash, hash, rai::block_hash (0)));
+		add_pull (rai::pull_info (hash_a, hash_a, rai::block_hash (0)));
 	}
 }
 
@@ -2456,7 +2456,7 @@ bool rai::bootstrap_lazy::process_block (std::shared_ptr<rai::block> block_a)
 			{
 				add_hash (block_a->source ());
 			}
-			else if (block_a->type () == rai::state_block && !block_a->link ().is_zero ())
+			else if (block_a->type () == rai::block_type::state_block && !block_a->link ().is_zero ())
 			{
 				//weak assumption
 				add_hash (block_a->link ());

@@ -316,7 +316,7 @@ public:
 class bootstrap_lazy : public bootstrap_attempt
 {
 public:
-	void run_lazy () override;
+	void run_lazy ();
 	void add_hash (rai::block_hash const & hash_a);
 	bool process_block (std::shared_ptr<rai::block>);
 private:
