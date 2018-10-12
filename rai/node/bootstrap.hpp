@@ -321,6 +321,13 @@ public:
 	void run_lazy ();
 	void add_hash (rai::block_hash const & hash_a);
 	bool process_block (std::shared_ptr<rai::block>);
+	std::chrono::steady_clock::time_point next_log;
+	std::atomic<unsigned> connections;
+	std::atomic<unsigned> pulling;
+	std::shared_ptr<rai::node> node;
+	std::atomic<unsigned> account_count;
+	std::atomic<uint64_t> total_blocks;
+	bool stopped;
 private:
 	std::unordered_set <rai::block_hash> processed_blocks;
 };
