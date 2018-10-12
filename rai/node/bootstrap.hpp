@@ -318,6 +318,7 @@ class bootstrap_lazy : public bootstrap_attempt
 public:
 	bootstrap_lazy (std::shared_ptr<rai::node> node_a);
 	~bootstrap_lazy ();
+	std::shared_ptr<rai::node> node;
 	void run_lazy ();
 	void add_hash (rai::block_hash const & hash_a);
 	bool process_block (std::shared_ptr<rai::block>);
