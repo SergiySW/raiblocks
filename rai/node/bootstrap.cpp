@@ -2456,7 +2456,7 @@ bool rai::bootstrap_lazy::process_block (std::shared_ptr<rai::block> block_a)
 			{
 				add_hash (block_a->source ());
 			}
-			else if (block_a->type () == rai::block_type::state_block && !block_a->link ().is_zero ())
+			else if (block_a->type () == rai::block_type::state && !block_a->link ().is_zero ())
 			{
 				//weak assumption
 				add_hash (block_a->link ());
