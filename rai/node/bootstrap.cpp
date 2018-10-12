@@ -2386,9 +2386,9 @@ void rai::frontier_req_server::next ()
 /*
  * Lazy Bootstrapping Client
  */
-rai::bootstrap_lazy::bootstrap_lazy (std::shared_ptr<rai::node> node_a)
+rai::bootstrap_lazy::bootstrap_lazy (std::shared_ptr<rai::node> node_a) : 
+node (node_a)
 {
-	node = node_a;
 	next_log = std::chrono::steady_clock::now ();
 	connections = 0;
 	pulling = 0;
