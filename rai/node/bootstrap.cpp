@@ -2386,6 +2386,24 @@ void rai::frontier_req_server::next ()
 /*
  * Lazy Bootstrapping Client
  */
+rai::bootstrap_lazy::bootstrap_lazy (std::shared_ptr<rai::node> node_a)
+{
+	node = node_a;
+	next_log = std::chrono::steady_clock::now ();
+	connections = 0;
+	pulling = 0;
+	account_count = 0;
+	total_blocks = 0;
+	stopped = false;
+	BOOST_LOG (node->log) << "Starting bootstrap lazy attempt";
+	//node->bootstrap_initiator.notify_listeners (true);
+}
+
+rai::bootstrap_lazy::~bootstrap_lazy ()
+{
+	BOOST_LOG (node->log) << "Exiting bootstrap lazy attempt";
+	//node->bootstrap_initiator.notify_listeners (false);
+}
 
 void rai::bootstrap_lazy::run_lazy ()
 {
