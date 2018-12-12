@@ -1559,6 +1559,32 @@ void rai::rpc_handler::confirmation_quorum ()
 	response_errors ();
 }
 
+/*
+ * @warning This is an internal/diagnostic RPC, do not rely on its interface being stable
+ */
+void rai::rpc_handler::confirmation_random ()
+{
+	auto count (count_impl ());
+	if (!ec)
+	{
+		auto transaction (node.store.tx_begin_read ());
+		for (auto i (0); i != count; ++i)
+		{
+			std::shared_ptr<rai::block> block (node.store.block_random (transaction));
+			if (block != nullptr)
+			{
+				node.block_confirm (block);
+			}
+			else
+			{
+				ec = nano::error_blocks::not_found;
+			}
+		}
+		response_l.put ("started", "1");
+	}
+	response_errors ();
+}
+
 void rai::rpc_handler::delegators ()
 {
 	auto account (account_impl ());
@@ -4010,6 +4036,10 @@ void rai::rpc_handler::process_request ()
 			else if (action == "confirmation_quorum")
 			{
 				confirmation_quorum ();
+			}
+			else if (action == "confirmation_random")
+			{
+				confirmation_random ();
 			}
 			else if (action == "frontiers")
 			{
