@@ -1559,6 +1559,14 @@ size_t rai::mdb_store::account_count (rai::transaction const & transaction_a)
 	return result;
 }
 
+size_t rai::mdb_store::account_v0_count (rai::transaction const & transaction_a)
+{
+	MDB_stat stats1;
+	auto status1 (mdb_stat (env.tx (transaction_a), accounts_v0, &stats1));
+	release_assert (status1 == 0);
+	return stats1.ms_entries;
+}
+
 void rai::mdb_store::account_put (rai::transaction const & transaction_a, rai::account const & account_a, rai::account_info const & info_a)
 {
 	MDB_dbi db;

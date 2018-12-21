@@ -172,6 +172,7 @@ public:
 	void account_del (rai::transaction const &, rai::account const &) override;
 	bool account_exists (rai::transaction const &, rai::account const &) override;
 	size_t account_count (rai::transaction const &) override;
+	size_t account_v0_count (rai::transaction const &) override;
 	rai::store_iterator<rai::account, rai::account_info> latest_v0_begin (rai::transaction const &, rai::account const &) override;
 	rai::store_iterator<rai::account, rai::account_info> latest_v0_begin (rai::transaction const &) override;
 	rai::store_iterator<rai::account, rai::account_info> latest_v0_end () override;

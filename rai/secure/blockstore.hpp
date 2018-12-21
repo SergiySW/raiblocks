@@ -213,6 +213,7 @@ public:
 	virtual void account_del (rai::transaction const &, rai::account const &) = 0;
 	virtual bool account_exists (rai::transaction const &, rai::account const &) = 0;
 	virtual size_t account_count (rai::transaction const &) = 0;
+		virtual size_t account_v0_count (rai::transaction const &) = 0;
 	virtual rai::store_iterator<rai::account, rai::account_info> latest_v0_begin (rai::transaction const &, rai::account const &) = 0;
 	virtual rai::store_iterator<rai::account, rai::account_info> latest_v0_begin (rai::transaction const &) = 0;
 	virtual rai::store_iterator<rai::account, rai::account_info> latest_v0_end () = 0;
