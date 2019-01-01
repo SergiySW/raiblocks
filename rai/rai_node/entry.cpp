@@ -27,6 +27,7 @@ int main (int argc, char * const * argv)
 		("debug_block_count", "Display the number of block")
 		("debug_bootstrap_generate", "Generate bootstrap sequence of blocks")
 		("debug_dump_representatives", "List representatives and weights")
+		("debug_epoch_count", "Display the number of accounts remaining to upgrade with epoch blocks")
 		("debug_account_count", "Display the number of accounts")
 		("debug_mass_activity", "Generates fake debug activity")
 		("debug_profile_generate", "Profile work generation")
@@ -155,6 +156,29 @@ int main (int argc, char * const * argv)
 				total += i->second;
 				std::cout << boost::str (boost::format ("%1% %2% %3%\n") % i->first.to_account () % i->second.convert_to<std::string> () % total.convert_to<std::string> ());
 			}
+		}
+		else if (vm.count ("debug_epoch_count"))
+		{
+			rai::inactive_node node (data_path);
+			auto transaction (node.node->store.tx_begin ());
+			size_t account_v0_count (0);
+			for (auto i (node.node->store.latest_v0_begin (transaction)), n (node.node->store.latest_v0_end ()); i != n; ++i)
+			{
+				account_v0_count++;
+			}
+			std::unordered_set<rai::account> pending_accounts;
+			for (auto i (node.node->store.pending_v0_begin (transaction)), n (node.node->store.pending_v0_end ()); i != n; ++i)
+			{
+				rai::account account (i->first.account);
+				if (pending_accounts.find (account) == pending_accounts.end ())
+				{
+					if (!node.node->store.account_exists (transaction, account))
+					{
+						pending_accounts.insert (account);
+					}
+				}
+			}
+			std::cout << boost::str (boost::format ("Accounts v0 count: %1%\nUnopened accounts with pending v0 count: %2%") % account_v0_count % pending_accounts.size ()) << std::endl;
 		}
 		else if (vm.count ("debug_account_count"))
 		{
