@@ -284,7 +284,7 @@ bool confirm_block (nano::transaction const & transaction_a, nano::node & node_a
 	return result;
 }
 
-void nano::network::republish_block (std::shared_ptr<nano::block> block, bool reps)
+void nano::network::republish_block (std::shared_ptr<nano::block> block, bool representatives)
 {
 	auto hash (block->hash ());
 	auto list (node.peers.list_fanout ());
@@ -294,7 +294,7 @@ void nano::network::republish_block (std::shared_ptr<nano::block> block, bool re
 	{
 		republish (hash, bytes, *i);
 	}
-	if (reps)
+	if (representatives)
 	{
 		auto reps (node.peers.representatives (2 * node.peers.size_sqrt ()));
 		for (auto i (reps.begin ()), n (reps.end ()); i != n; ++i)
