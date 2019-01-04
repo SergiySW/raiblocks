@@ -284,7 +284,7 @@ bool confirm_block (nano::transaction const & transaction_a, nano::node & node_a
 	return result;
 }
 
-void nano::network::republish_block (std::shared_ptr<nano::block> block)
+void nano::network::republish_block (std::shared_ptr<nano::block> block, bool reps)
 {
 	auto hash (block->hash ());
 	auto list (node.peers.list_fanout ());
@@ -293,6 +293,14 @@ void nano::network::republish_block (std::shared_ptr<nano::block> block)
 	for (auto i (list.begin ()), n (list.end ()); i != n; ++i)
 	{
 		republish (hash, bytes, *i);
+	}
+	if (reps)
+	{
+		auto reps (node.peers.representatives (2 * node.peers.size_sqrt ()));
+		for (auto i (reps.begin ()), n (reps.end ()); i != n; ++i)
+		{
+			republish (hash, bytes, i->endpoint);
+		}
 	}
 	if (node.config.logging.network_logging ())
 	{
@@ -3454,8 +3462,8 @@ bool nano::active_transactions::add (std::shared_ptr<nano::block> block_a, std::
 	}
 	if (!error && roots.size () < max_broadcast_queue)
 	{
-		// Broadcast new block
-		node.network.republish_block (block_a);
+		// Broadcast new block to peers & top representatives
+		node.network.republish_block (block_a, true);
 		// Request confirmation for new block
 		std::weak_ptr<nano::node> node_w (node.shared ());
 		node.alarm.add (std::chrono::steady_clock::now () + confirmation_request_delay, [node_w, block_a]() {

@@ -301,7 +301,7 @@ public:
 	void receive_action (nano::udp_data *);
 	void rpc_action (boost::system::error_code const &, size_t);
 	void republish_vote (std::shared_ptr<nano::vote>);
-	void republish_block (std::shared_ptr<nano::block>);
+	void republish_block (std::shared_ptr<nano::block>, bool = false);
 	static unsigned const broadcast_interval_ms = 10;
 	void republish_block_batch (std::deque<std::shared_ptr<nano::block>>, unsigned = broadcast_interval_ms);
 	void republish (nano::block_hash const &, std::shared_ptr<std::vector<uint8_t>>, nano::endpoint);
