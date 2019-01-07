@@ -98,6 +98,8 @@ public:
 	void lazy_add (nano::block_hash const &);
 	bool lazy_finished ();
 	void lazy_pull_flush ();
+	void request_pending (std::unique_lock<std::mutex> &);
+	void requeue_pending (nano::account const &);
 	void wallet_run ();
 	void wallet_start (std::deque<nano::account> &);
 	void wallet_pending_add (nano::block_hash const &);
