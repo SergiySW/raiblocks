@@ -781,7 +781,7 @@ void nano::bulk_pull_account_client::request ()
 	else if (connection->node->config.logging.network_logging () && connection->attempt->should_log ())
 	{
 		std::unique_lock<std::mutex> lock (connection->attempt->mutex);
-		BOOST_LOG (connection->node->log) << boost::str (boost::format ("%1% accounts in pull queue") % connection->attempt->account.size ());
+		BOOST_LOG (connection->node->log) << boost::str (boost::format ("%1% accounts in pull queue") % connection->attempt->wallet_accounts.size ());
 	}
 	auto this_l (shared_from_this ());
 	connection->socket->async_write (buffer, [this_l](boost::system::error_code const & ec, size_t size_a) {
@@ -791,7 +791,7 @@ void nano::bulk_pull_account_client::request ()
 		}
 		else
 		{
-			connection->attempt->requeue_account (account);
+			this_l->connection->attempt->requeue_account (account);
 			if (this_l->connection->node->config.logging.bulk_pull_logging ())
 			{
 				BOOST_LOG (this_l->connection->node->log) << boost::str (boost::format ("Error starting bulk pull request to %1%: to %2%") % ec.message () % this_l->connection->endpoint);
