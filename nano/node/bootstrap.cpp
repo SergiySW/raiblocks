@@ -745,7 +745,7 @@ void nano::bulk_push_client::push_block (nano::block const & block_a)
 
 nano::bulk_pull_account_client::bulk_pull_account_client (std::shared_ptr<nano::bootstrap_client> connection_a, nano::account const & account_a) :
 connection (connection_a),
-account (pull_a),
+account (account_a),
 total_blocks (0)
 {
 	std::lock_guard<std::mutex> mutex (connection->attempt->mutex);
@@ -766,7 +766,7 @@ void nano::bulk_pull_account_client::request ()
 	nano::bulk_pull_account req;
 	req.account = account;
 	req.minimum_amount = connection->node->config.receive_minimum;
-	req.bulk_pull_account_flags = nano::bulk_pull_account_flags::pending_hash_and_amount;
+	req.flags = nano::bulk_pull_account_flags::pending_hash_and_amount;
 
 	auto buffer (std::make_shared<std::vector<uint8_t>> ());
 	{

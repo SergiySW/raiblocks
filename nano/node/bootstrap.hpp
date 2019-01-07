@@ -213,7 +213,7 @@ public:
 	void request ();
 	void receive_pending ();
 	std::shared_ptr<nano::bootstrap_client> connection;
-	nano::acount account;
+	nano::account account;
 	uint64_t total_blocks;
 };
 class bootstrap_initiator
