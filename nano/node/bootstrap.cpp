@@ -791,7 +791,7 @@ void nano::bulk_pull_account_client::request ()
 		}
 		else
 		{
-			this_l->connection->attempt->requeue_account (account);
+			this_l->connection->attempt->requeue_pending (account);
 			if (this_l->connection->node->config.logging.bulk_pull_logging ())
 			{
 				BOOST_LOG (this_l->connection->node->log) << boost::str (boost::format ("Error starting bulk pull request to %1%: to %2%") % ec.message () % this_l->connection->endpoint);
@@ -812,43 +812,43 @@ void nano::bulk_pull_account_client::receive_pending ()
 			if (!ec)
 			{
 				nano::block_hash frontier;
-				nano::bufferstream frontier_stream (connection->receive_buffer->data (), sizeof (nano::uint256_union));
+				nano::bufferstream frontier_stream (this_l->connection->receive_buffer->data (), sizeof (nano::uint256_union));
 				auto error1 (nano::read (frontier_stream, frontier));
 				assert (!error1);
 				nano::amount balance;
-				nano::bufferstream balance_stream (connection->receive_buffer->data () + sizeof (nano::uint256_union), sizeof (nano::uint128_union));
+				nano::bufferstream balance_stream (this_l->connection->receive_buffer->data () + sizeof (nano::uint256_union), sizeof (nano::uint128_union));
 				auto error2 (nano::read (balance_stream, balance));
 				assert (!error2);
 				if (!frontier.is_zero ())
 				{
-					if (total_blocks == 0 || balance.number () >= connection->node->config.receive_minimum.number ())
+					if (this_l->total_blocks == 0 || balance.number () >= this_l->connection->node->config.receive_minimum.number ())
 					{
-						total_blocks++;
-						connection->attempt->wallet_pending_add (frontier);
-						receive_pending ();
+						this_l->total_blocks++;
+						this_l->connection->attempt->wallet_pending_add (frontier);
+						this_l->receive_pending ();
 					}
 					else
 					{
-						connection->attempt->requeue_account (account);
+						this_l->connection->attempt->requeue_pending (account);
 					}
 				}
 				else
 				{
-					connection->attempt->pool_connection (connection);
+					this_l->connection->attempt->pool_connection (connection);
 				}
 			}
 			else
 			{
-				connection->attempt->requeue_account (account);
-				if (connection->node->config.logging.network_logging ())
+				this_l->connection->attempt->requeue_pending (account);
+				if (this_l->connection->node->config.logging.network_logging ())
 				{
-					BOOST_LOG (connection->node->log) << boost::str (boost::format ("Error while receiving bulk pull account frontier %1%") % ec.message ());
+					BOOST_LOG (this_l->connection->node->log) << boost::str (boost::format ("Error while receiving bulk pull account frontier %1%") % ec.message ());
 				}
 			}
 		}
 		else
 		{
-			connection->attempt->requeue_account (account);
+			this_l->connection->attempt->requeue_pending (account);
 			if (this_l->connection->node->config.logging.network_message_logging ())
 			{
 				BOOST_LOG (this_l->connection->node->log) << boost::str (boost::format ("Invalid size: expected %1%, got %2%") % size_l % size_a);
