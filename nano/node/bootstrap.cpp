@@ -423,7 +423,7 @@ nano::bulk_pull_client::~bulk_pull_client ()
 	if (expected != pull.end)
 	{
 		pull.head = expected;
-		if (connection->attempt->lazy_mode)
+		if (connection->attempt->mode == nano::bootstrap_mode::lazy)
 		{
 			pull.account = expected;
 		}
@@ -768,7 +768,7 @@ node (node_a),
 account_count (0),
 total_blocks (0),
 stopped (false),
-lazy_mode (false),
+mode (nano::bootstrap_mode::legacy),
 lazy_stopped (0)
 {
 	BOOST_LOG (node->log) << "Starting bootstrap attempt";
@@ -1473,7 +1473,7 @@ bool nano::bootstrap_attempt::process_block (std::shared_ptr<nano::block> block_
 			}
 		}
 	}
-	else if (lazy_mode)
+	else if (mode == nano::bootstrap_mode::lazy)
 	{
 		// Drop connection with unexpected block for lazy bootstrap
 		stop_pull = true;
@@ -1483,6 +1483,103 @@ bool nano::bootstrap_attempt::process_block (std::shared_ptr<nano::block> block_
 		node->block_processor.add (block_a, std::chrono::steady_clock::time_point ());
 	}
 	return stop_pull;
+}
+
+bool nano::bootstrap_attempt::request_pending (std::unique_lock<std::mutex> & lock_a)
+{
+	auto connection_l (connection (lock_a));
+	if (connection_l)
+	{
+		auto account (accounts.front ());
+		accounts.pop_front ();
+		++pulling;
+		// The bulk_pull_client destructor attempt to requeue_pull which can cause a deadlock if this is the last reference
+		// Dispatch request in an external thread in case it needs to be destroyed
+		node->background ([connection_l, account]() {
+			auto client (std::make_shared<nano::bulk_pull_client> (connection_l, account));
+			client->request ();
+		});
+	}
+}
+
+void nano::bootstrap_attempt::wallet_start (std::vector<nano::account> const & accounts_a)
+{
+	std::unique_lock<std::mutex> lock (mutex);
+	account = accounts_a;
+}
+
+void nano::bootstrap_attempt::wallet_run ()
+{
+	populate_connections ();
+	auto start_time (std::chrono::steady_clock::now ());
+	auto max_time (std::chrono::minutes (10));
+	std::unique_lock<std::mutex> lock (mutex);
+	while (!stopped && frontier_failure)
+	{
+		frontier_failure = request_frontier (lock);
+	}
+	
+	
+	while ((still_pulling () || !lazy_finished ()) && lazy_stopped < lazy_max_stopped && std::chrono::steady_clock::now () - start_time < max_time)
+	{
+		unsigned iterations (0);
+		while (still_pulling () && lazy_stopped < lazy_max_stopped && std::chrono::steady_clock::now () - start_time < max_time)
+		{
+			if (!pulls.empty ())
+			{
+				if (!node->block_processor.full ())
+				{
+					request_pull (lock);
+				}
+				else
+				{
+					condition.wait_for (lock, std::chrono::seconds (15));
+				}
+			}
+			else
+			{
+				condition.wait (lock);
+			}
+			++iterations;
+			// Flushing lazy pulls
+			if (iterations % 100 == 0)
+			{
+				lock.unlock ();
+				lazy_pull_flush ();
+				lock.lock ();
+			}
+		}
+		// Flushing may resolve forks which can add more pulls
+		// Flushing lazy pulls
+		lock.unlock ();
+		node->block_processor.flush ();
+		lazy_pull_flush ();
+		lock.lock ();
+	}
+	if (!stopped)
+	{
+		BOOST_LOG (node->log) << "Completed lazy pulls";
+		// Fallback to legacy bootstrap
+		std::unique_lock<std::mutex> lazy_lock (lazy_mutex);
+		if (!lazy_keys.empty () && !node->flags.disable_legacy_bootstrap)
+		{
+			pulls.clear ();
+			lock.unlock ();
+			lazy_blocks.clear ();
+			lazy_keys.clear ();
+			lazy_pulls.clear ();
+			lazy_state_unknown.clear ();
+			lazy_balances.clear ();
+			lazy_stopped = 0;
+			lazy_mode = false;
+			lazy_lock.unlock ();
+			run ();
+			lock.lock ();
+		}
+	}
+	stopped = true;
+	condition.notify_all ();
+	idle.clear ();
 }
 
 nano::bootstrap_initiator::bootstrap_initiator (nano::node & node_a) :
@@ -1549,9 +1646,24 @@ void nano::bootstrap_initiator::bootstrap_lazy (nano::block_hash const & hash_a,
 		if (attempt == nullptr)
 		{
 			attempt = std::make_shared<nano::bootstrap_attempt> (node.shared ());
-			attempt->lazy_mode = true;
+			attempt->mode = nano::bootstrap_mode::lazy;
 		}
 		attempt->lazy_start (hash_a);
+	}
+	condition.notify_all ();
+}
+
+void nano::bootstrap_initiator::bootstrap_wallet (std::vector<nano::account> const & accounts_a)
+{
+	{
+		std::unique_lock<std::mutex> lock (mutex);
+		node.stats.inc (nano::stat::type::bootstrap, nano::stat::detail::initiate_wallet_lazy, nano::stat::dir::out);
+		if (attempt == nullptr)
+		{
+			attempt = std::make_shared<nano::bootstrap_attempt> (node.shared ());
+			attempt->mode = nano::bootstrap_mode::wallet;
+		}
+		attempt->wallet_start (accounts_a);
 	}
 	condition.notify_all ();
 }
@@ -1564,13 +1676,17 @@ void nano::bootstrap_initiator::run_bootstrap ()
 		if (attempt != nullptr)
 		{
 			lock.unlock ();
-			if (!attempt->lazy_mode)
+			if (attempt->mode == nano::bootstrap_mode::legacy)
 			{
 				attempt->run ();
 			}
-			else
+			else if (attempt->mode == nano::bootstrap_mode::lazy)
 			{
 				attempt->lazy_run ();
+			}
+			else
+			{
+				attempt->wallet_run ();
 			}
 			lock.lock ();
 			attempt = nullptr;
