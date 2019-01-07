@@ -1910,7 +1910,7 @@ void nano::gap_cache::add (nano::transaction const & transaction_a, nano::block_
 	auto existing (blocks.get<1> ().find (hash_a));
 	if (existing != blocks.get<1> ().end ())
 	{
-		blocks.get<1> ().modify (existing, [](nano::gap_information & info) {
+		blocks.get<1> ().modify (existing, [time_point_a](nano::gap_information & info) {
 			info.arrival = time_point_a;
 		});
 	}

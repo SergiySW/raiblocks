@@ -791,7 +791,7 @@ void nano::bulk_pull_account_client::request ()
 		}
 		else
 		{
-			this_l->connection->attempt->requeue_pending (account);
+			this_l->connection->attempt->requeue_pending (this_l->account);
 			if (this_l->connection->node->config.logging.bulk_pull_logging ())
 			{
 				BOOST_LOG (this_l->connection->node->log) << boost::str (boost::format ("Error starting bulk pull request to %1%: to %2%") % ec.message () % this_l->connection->endpoint);
@@ -829,17 +829,17 @@ void nano::bulk_pull_account_client::receive_pending ()
 					}
 					else
 					{
-						this_l->connection->attempt->requeue_pending (account);
+						this_l->connection->attempt->requeue_pending (this_l->account);
 					}
 				}
 				else
 				{
-					this_l->connection->attempt->pool_connection (connection);
+					this_l->connection->attempt->pool_connection (this_l->connection);
 				}
 			}
 			else
 			{
-				this_l->connection->attempt->requeue_pending (account);
+				this_l->connection->attempt->requeue_pending (this_l->account);
 				if (this_l->connection->node->config.logging.network_logging ())
 				{
 					BOOST_LOG (this_l->connection->node->log) << boost::str (boost::format ("Error while receiving bulk pull account frontier %1%") % ec.message ());
@@ -848,7 +848,7 @@ void nano::bulk_pull_account_client::receive_pending ()
 		}
 		else
 		{
-			this_l->connection->attempt->requeue_pending (account);
+			this_l->connection->attempt->requeue_pending (this_l->account);
 			if (this_l->connection->node->config.logging.network_message_logging ())
 			{
 				BOOST_LOG (this_l->connection->node->log) << boost::str (boost::format ("Invalid size: expected %1%, got %2%") % size_l % size_a);
@@ -1599,7 +1599,7 @@ bool nano::bootstrap_attempt::process_block (std::shared_ptr<nano::block> block_
 	return stop_pull;
 }
 
-bool nano::bootstrap_attempt::request_pending (std::unique_lock<std::mutex> & lock_a)
+void nano::bootstrap_attempt::request_pending (std::unique_lock<std::mutex> & lock_a)
 {
 	auto connection_l (connection (lock_a));
 	if (connection_l)
@@ -1621,7 +1621,7 @@ void nano::bootstrap_attempt::requeue_pending (nano::account const & account_a)
 	auto account (account_a);
 	{
 		std::lock_guard<std::mutex> lock (mutex);
-		wallet_accounts.push_front (pull);
+		wallet_accounts.push_front (account);
 		condition.notify_all ();
 	}
 }
