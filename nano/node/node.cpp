@@ -1487,7 +1487,7 @@ nano::process_return nano::block_processor::process_one (nano::transaction const
 				BOOST_LOG (node.log) << boost::str (boost::format ("Gap previous for: %1%") % hash.to_string ());
 			}
 			node.store.unchecked_put (transaction_a, block_a->previous (), block_a);
-			node.gap_cache.add (transaction_a, block_a);
+			node.gap_cache.add (transaction_a, hash);
 			break;
 		}
 		case nano::process_result::gap_source:
@@ -1497,7 +1497,7 @@ nano::process_return nano::block_processor::process_one (nano::transaction const
 				BOOST_LOG (node.log) << boost::str (boost::format ("Gap source for: %1%") % hash.to_string ());
 			}
 			node.store.unchecked_put (transaction_a, node.ledger.block_source (transaction_a, *block_a), block_a);
-			node.gap_cache.add (transaction_a, block_a);
+			node.gap_cache.add (transaction_a, hash);
 			break;
 		}
 		case nano::process_result::old:
@@ -1904,20 +1904,19 @@ node (node_a)
 {
 }
 
-void nano::gap_cache::add (nano::transaction const & transaction_a, std::shared_ptr<nano::block> block_a)
+void nano::gap_cache::add (nano::transaction const & transaction_a, nano::block_hash const & hash_a, std::chrono::steady_clock::time_point time_point_a)
 {
-	auto hash (block_a->hash ());
 	std::lock_guard<std::mutex> lock (mutex);
-	auto existing (blocks.get<1> ().find (hash));
+	auto existing (blocks.get<1> ().find (hash_a));
 	if (existing != blocks.get<1> ().end ())
 	{
 		blocks.get<1> ().modify (existing, [](nano::gap_information & info) {
-			info.arrival = std::chrono::steady_clock::now ();
+			info.arrival = time_point_a;
 		});
 	}
 	else
 	{
-		blocks.insert ({ std::chrono::steady_clock::now (), hash, std::unordered_set<nano::account> () });
+		blocks.insert ({ time_point_a, hash_a, std::unordered_set<nano::account> () });
 		if (blocks.size () > max)
 		{
 			blocks.get<0> ().erase (blocks.get<0> ().begin ());

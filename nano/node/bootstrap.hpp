@@ -70,6 +70,7 @@ enum class bootstrap_mode
 };
 class frontier_req_client;
 class bulk_push_client;
+class bulk_pull_account_client;
 class bootstrap_attempt : public std::enable_shared_from_this<bootstrap_attempt>
 {
 public:
@@ -98,7 +99,9 @@ public:
 	bool lazy_finished ();
 	void lazy_pull_flush ();
 	void wallet_run ();
-	void wallet_start (std::vector<nano::account> const &);
+	void wallet_start (std::deque<nano::account> &);
+	void wallet_pending_add (nano::block_hash const &);
+	bool wallet_finished ();
 	std::chrono::steady_clock::time_point next_log;
 	std::deque<std::weak_ptr<nano::bootstrap_client>> clients;
 	std::weak_ptr<nano::bootstrap_client> connection_frontier_request;
@@ -113,7 +116,7 @@ public:
 	std::atomic<uint64_t> total_blocks;
 	std::vector<std::pair<nano::block_hash, nano::block_hash>> bulk_push_targets;
 	bool stopped;
-	nano:bootstrap_mode mode;
+	nano::bootstrap_mode mode;
 	std::mutex mutex;
 	std::condition_variable condition;
 	// Lazy bootstrap
@@ -127,7 +130,8 @@ public:
 	uint64_t lazy_max_stopped = 256;
 	std::mutex lazy_mutex;
 	// Wallet lazy bootstrap
-	std::vector<nano::account> wallet_accounts;
+	std::deque<nano::account> wallet_accounts;
+	std::vector<nano::block_hash> pending;
 };
 class frontier_req_client : public std::enable_shared_from_this<nano::frontier_req_client>
 {
@@ -201,6 +205,17 @@ public:
 	std::promise<bool> promise;
 	std::pair<nano::block_hash, nano::block_hash> current_target;
 };
+class bulk_pull_account_client : public std::enable_shared_from_this<nano::bulk_pull_account_client>
+{
+public:
+	bulk_pull_account_client (std::shared_ptr<nano::bootstrap_client>, nano::account const &);
+	~bulk_pull_account_client ();
+	void request ();
+	void receive_pending ();
+	std::shared_ptr<nano::bootstrap_client> connection;
+	nano::acount account;
+	uint64_t total_blocks;
+};
 class bootstrap_initiator
 {
 public:
@@ -209,7 +224,7 @@ public:
 	void bootstrap (nano::endpoint const &, bool add_to_peers = true);
 	void bootstrap ();
 	void bootstrap_lazy (nano::block_hash const &, bool = false);
-	void bootstrap_wallet (std::vector<nano::account> const &);
+	void bootstrap_wallet (std::deque<nano::account> &);
 	void run_bootstrap ();
 	void notify_listeners (bool);
 	void add_observer (std::function<void(bool)> const &);

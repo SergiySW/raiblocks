@@ -168,7 +168,7 @@ class gap_cache
 {
 public:
 	gap_cache (nano::node &);
-	void add (nano::transaction const &, std::shared_ptr<nano::block>);
+	void add (nano::transaction const &, nano::block_hash const &, std::chrono::steady_clock::time_point = std::chrono::steady_clock::now ());
 	void vote (std::shared_ptr<nano::vote>);
 	nano::uint128_t bootstrap_threshold (nano::transaction const &);
 	boost::multi_index_container<
