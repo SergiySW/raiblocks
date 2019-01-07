@@ -102,7 +102,6 @@ public:
 	void requeue_pending (nano::account const &);
 	void wallet_run ();
 	void wallet_start (std::deque<nano::account> &);
-	void wallet_pending_add (nano::block_hash const &);
 	bool wallet_finished ();
 	std::chrono::steady_clock::time_point next_log;
 	std::deque<std::weak_ptr<nano::bootstrap_client>> clients;
@@ -133,7 +132,6 @@ public:
 	std::mutex lazy_mutex;
 	// Wallet lazy bootstrap
 	std::deque<nano::account> wallet_accounts;
-	std::vector<nano::block_hash> pending;
 };
 class frontier_req_client : public std::enable_shared_from_this<nano::frontier_req_client>
 {
