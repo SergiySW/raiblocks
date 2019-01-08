@@ -1603,7 +1603,7 @@ bool nano::bootstrap_attempt::process_block (std::shared_ptr<nano::block> block_
 			}
 		}
 	}
-	else if (mode == nano::bootstrap_mode::legacy)
+	else if (mode != nano::bootstrap_mode::legacy)
 	{
 		// Drop connection with unexpected block for lazy bootstrap
 		stop_pull = true;
