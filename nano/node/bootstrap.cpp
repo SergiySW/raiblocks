@@ -1761,7 +1761,7 @@ void nano::bootstrap_initiator::bootstrap_wallet (std::deque<nano::account> & ac
 		if (attempt == nullptr)
 		{
 			attempt = std::make_shared<nano::bootstrap_attempt> (node.shared ());
-			attempt->mode = nano::bootstrap_mode::wallet;
+			attempt->mode = nano::bootstrap_mode::wallet_lazy;
 		}
 		attempt->wallet_start (accounts_a);
 	}

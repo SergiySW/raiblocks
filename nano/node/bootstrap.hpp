@@ -66,7 +66,7 @@ enum class bootstrap_mode
 {
 	legacy,
 	lazy,
-	wallet
+	wallet_lazy
 };
 class frontier_req_client;
 class bulk_push_client;
