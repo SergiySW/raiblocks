@@ -811,25 +811,26 @@ void nano::bulk_pull_account_client::receive_pending ()
 		{
 			if (!ec)
 			{
-				nano::block_hash frontier;
+				nano::block_hash pending;
 				nano::bufferstream frontier_stream (this_l->connection->receive_buffer->data (), sizeof (nano::uint256_union));
-				auto error1 (nano::read (frontier_stream, frontier));
+				auto error1 (nano::read (frontier_stream, pending));
 				assert (!error1);
 				nano::amount balance;
 				nano::bufferstream balance_stream (this_l->connection->receive_buffer->data () + sizeof (nano::uint256_union), sizeof (nano::uint128_union));
 				auto error2 (nano::read (balance_stream, balance));
 				assert (!error2);
-				if (!frontier.is_zero ())
+				if (this_l->total_blocks == 0 || !pending.is_zero ())
 				{
 					if (this_l->total_blocks == 0 || balance.number () >= this_l->connection->node->config.receive_minimum.number ())
 					{
 						this_l->total_blocks++;
 						{
+							if (!pending.is_zero ())
 							{
 								auto transaction (this_l->connection->node->store.tx_begin_read ());
-								if (!this_l->connection->node->store.block_exists (transaction, frontier))
+								if (!this_l->connection->node->store.block_exists (transaction, pending))
 								{
-									this_l->connection->attempt->lazy_start (frontier);
+									this_l->connection->attempt->lazy_start (pending);
 								}
 							}
 						}
