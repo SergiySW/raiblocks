@@ -838,6 +838,37 @@ TEST (bootstrap_processor, lazy_max_pull_count)
 	node1->stop ();
 }
 
+TEST (bootstrap_processor, wallet_lazy)
+{
+	nano::system system (24000, 1);
+	nano::node_init init1;
+	nano::genesis genesis;
+	nano::keypair key1;
+	nano::keypair key2;
+	// Generating test chain
+	auto send1 (std::make_shared<nano::state_block> (nano::test_genesis_key.pub, genesis.hash (), nano::test_genesis_key.pub, nano::genesis_amount - nano::Gxrb_ratio, key1.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, system.nodes[0]->work_generate_blocking (genesis.hash ())));
+	auto receive1 (std::make_shared<nano::state_block> (key1.pub, 0, key1.pub, nano::Gxrb_ratio, send1->hash (), key1.prv, key1.pub, system.nodes[0]->work_generate_blocking (key1.pub)));
+	auto send2 (std::make_shared<nano::state_block> (key1.pub, receive1->hash (), key1.pub, 0, key2.pub, key1.prv, key1.pub, system.nodes[0]->work_generate_blocking (receive1->hash ())));
+	auto receive2 (std::make_shared<nano::state_block> (key2.pub, 0, key2.pub, nano::Gxrb_ratio, send2->hash (), key2.prv, key2.pub, system.nodes[0]->work_generate_blocking (key2.pub)));
+	// Processing test chain
+	system.nodes[0]->block_processor.add (send1, std::chrono::steady_clock::time_point ());
+	system.nodes[0]->block_processor.add (receive1, std::chrono::steady_clock::time_point ());
+	system.nodes[0]->block_processor.add (send2, std::chrono::steady_clock::time_point ());
+	system.nodes[0]->block_processor.add (receive2, std::chrono::steady_clock::time_point ());
+	system.nodes[0]->block_processor.flush ();
+	// Start lazy bootstrap with last block in chain known
+	auto node1 (std::make_shared<nano::node> (init1, system.io_ctx, 24001, nano::unique_path (), system.alarm, system.logging, system.work));
+	node1->peers.insert (system.nodes[0]->network.endpoint (), nano::protocol_version);
+	node1->bootstrap_initiator.bootstrap_lazy (receive2->hash ());
+	// Check processed blocks
+	system.deadline_set (10s);
+	while (!node1->ledger.block_exists (receive2->hash ()))
+	{
+		ASSERT_NO_ERROR (system.poll ());
+	}
+	node1->stop ();
+}
+
 TEST (frontier_req_response, DISABLED_destruction)
 {
 	{
