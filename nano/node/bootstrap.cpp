@@ -1065,7 +1065,6 @@ void nano::bootstrap_attempt::run ()
 		{
 			lock.unlock ();
 			mode = nano::bootstrap_mode::wallet_lazy;
-			wallet_start ();
 			wallet_run ();
 			lock.lock ();
 		}
