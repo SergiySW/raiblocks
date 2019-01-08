@@ -1060,8 +1060,16 @@ void nano::bootstrap_attempt::run ()
 	{
 		BOOST_LOG (node->log) << "Completed pulls";
 		request_push (lock);
+		// Start wallet lazy bootstrap if required
+		if (!wallet_accounts.empty () && !node->flags.disable_wallet_bootstrap)
+		{
+			lock.unlock ();
+			mode = nano::bootstrap_mode::wallet_lazy;
+			lazy_run ();
+			lock.lock ();
+		}
 		// Start lazy bootstrap if some lazy keys were inserted
-		if (!lazy_keys.empty () && !node->flags.disable_lazy_bootstrap)
+		else if (!lazy_keys.empty () && !node->flags.disable_lazy_bootstrap)
 		{
 			lock.unlock ();
 			mode = nano::bootstrap_mode::lazy;
