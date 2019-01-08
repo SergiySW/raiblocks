@@ -1065,7 +1065,8 @@ void nano::bootstrap_attempt::run ()
 		{
 			lock.unlock ();
 			mode = nano::bootstrap_mode::wallet_lazy;
-			lazy_run ();
+			wallet_start ();
+			wallet_run ();
 			lock.lock ();
 		}
 		// Start lazy bootstrap if some lazy keys were inserted
