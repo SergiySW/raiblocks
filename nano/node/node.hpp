@@ -480,6 +480,7 @@ public:
 	void ongoing_store_flush ();
 	void backup_wallet ();
 	void search_pending ();
+	void bootstrap_wallet ();
 	int price (nano::uint128_t const &, int);
 	void work_generate_blocking (nano::block &, uint64_t = nano::work_pool::publish_threshold);
 	uint64_t work_generate_blocking (nano::uint256_union const &, uint64_t = nano::work_pool::publish_threshold);

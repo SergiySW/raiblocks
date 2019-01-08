@@ -2044,6 +2044,14 @@ void nano::node::start ()
 		backup_wallet ();
 	}
 	search_pending ();
+	if (!flags.disable_wallet_bootstrap)
+	{
+		// Delay to start wallet lazy bootstrap
+		auto this_l (shared ());
+		alarm.add (std::chrono::steady_clock::now () + std::chrono::minutes (1), [this_l]() {
+			this_l->bootstrap_wallet ();
+		});
+	}
 	online_reps.recalculate_stake ();
 	port_mapping.start ();
 	add_initial_peers ();
@@ -2241,6 +2249,26 @@ void nano::node::search_pending ()
 	alarm.add (std::chrono::steady_clock::now () + search_pending_interval, [this_l]() {
 		this_l->search_pending ();
 	});
+}
+
+void nano::node::bootstrap_wallet ()
+{
+	std::deque<nano::account> accounts;
+	{
+		std::lock_guard<std::mutex> lock (wallets.mutex);
+		auto transaction (store.tx_begin_read ());
+		for (auto i (wallets.items.begin ()), n (wallets.items.end ()); i != n && accounts.size () < 64; ++i)
+		{
+			auto & wallet (*i->second);
+			std::lock_guard<std::recursive_mutex> wallet_lock (wallet.store.mutex);
+			for (auto j (wallet.store.begin (transaction)), m (wallet.store.end ()); j != m && accounts.size () < 64; ++j)
+			{
+				nano::account account (j->first);
+				accounts.push_back (account);
+			}
+		}
+	}
+	bootstrap_initiator.bootstrap_wallet (accounts);
 }
 
 int nano::node::price (nano::uint128_t const & balance_a, int amount_a)
