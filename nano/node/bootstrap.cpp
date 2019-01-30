@@ -29,11 +29,14 @@ void nano::socket::async_connect (nano::tcp_endpoint const & endpoint_a, std::fu
 {
 	checkup ();
 	auto this_l (shared_from_this ());
-	start ();
-	socket_m.async_connect (endpoint_a, [this_l, callback_a](boost::system::error_code const & ec) {
-		this_l->stop ();
-		callback_a (ec);
-	});
+	if (socket_m.is_open ())
+	{
+		start ();
+		socket_m.async_connect (endpoint_a, [this_l, callback_a](boost::system::error_code const & ec) {
+			this_l->stop ();
+			callback_a (ec);
+		});
+	}
 }
 
 void nano::socket::async_read (std::shared_ptr<std::vector<uint8_t>> buffer_a, size_t size_a, std::function<void(boost::system::error_code const &, size_t)> callback_a)
