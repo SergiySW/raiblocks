@@ -1306,7 +1306,7 @@ TEST (block_store, upgrade_sideband_two_accounts)
 	nano::block_sideband sideband3;
 	auto block3 (store.block_get (transaction, hash3, &sideband3));
 	ASSERT_NE (nullptr, block3);
-	ASSERT_EQ (3, sideband3.height);
+	ASSERT_EQ (1, sideband3.height);
 }
 
 TEST (block_store, insert_after_legacy)
