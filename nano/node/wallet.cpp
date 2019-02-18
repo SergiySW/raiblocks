@@ -1508,7 +1508,7 @@ void nano::wallets::do_wallet_actions ()
 			auto wallet (first->second.first);
 			auto current (std::move (first->second.second));
 			actions.erase (first);
-			if (wallet->live ())
+			if (wallet != nullprt && wallet->live ())
 			{
 				action_lock.unlock ();
 				observer (true);
