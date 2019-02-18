@@ -177,7 +177,7 @@ public:
 	void destroy (nano::uint256_union const &);
 	void reload ();
 	void do_wallet_actions ();
-	void queue_wallet_action (nano::uint128_t const &, std::shared_ptr<nano::wallet>, std::function<void(nano::wallet &)> const &);
+	void queue_wallet_action (nano::uint128_t const &, std::shared_ptr<nano::wallet>, std::function<void()> const &);
 	void foreach_representative (nano::transaction const &, std::function<void(nano::public_key const &, nano::raw_key const &)> const &);
 	bool exists (nano::transaction const &, nano::public_key const &);
 	void stop ();
@@ -188,7 +188,7 @@ public:
 	void move_table (std::string const &, MDB_txn *, MDB_txn *);
 	std::function<void(bool)> observer;
 	std::unordered_map<nano::uint256_union, std::shared_ptr<nano::wallet>> items;
-	std::multimap<nano::uint128_t, std::pair<std::shared_ptr<nano::wallet>, std::function<void(nano::wallet &)>>, std::greater<nano::uint128_t>> actions;
+	std::multimap<nano::uint128_t, std::pair<std::shared_ptr<nano::wallet>, std::function<void()>>, std::greater<nano::uint128_t>> actions;
 	std::mutex mutex;
 	std::mutex action_mutex;
 	std::condition_variable condition;
