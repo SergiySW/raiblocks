@@ -321,7 +321,7 @@ extern nano::account const & genesis_account;
 extern nano::account const & burn_account;
 extern nano::uint128_t const & genesis_amount;
 // An account number that compares inequal to any real account number
-extern nano::account const & not_an_account ();
+extern nano::account const & not_an_account;
 class genesis
 {
 public:

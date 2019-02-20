@@ -117,10 +117,7 @@ nano::account const & nano::genesis_account (globals.genesis_account);
 std::string const & nano::genesis_block (globals.genesis_block);
 nano::uint128_t const & nano::genesis_amount (globals.genesis_amount);
 nano::account const & nano::burn_account (globals.burn_account);
-nano::account const & nano::not_an_account ()
-{
-	return globals.not_an_account ();
-}
+nano::account const & nano::not_an_account (globals.not_an_account ());
 // Create a new random keypair
 nano::keypair::keypair ()
 {
