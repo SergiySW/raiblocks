@@ -1479,6 +1479,17 @@ void nano::rpc_handler::bootstrap_status ()
 	response_errors ();
 }
 
+void nano::rpc_handler::bootstrap_max_set ()
+{
+	auto count (count_impl ());
+	if (!ec)
+	{
+		node.config.bootstrap_connections_max = count;
+		response_l.put ("success", "");
+	}
+	response_errors ();
+}
+
 void nano::rpc_handler::chain (bool successors)
 {
 	successors = successors != request.get<bool> ("reverse", false);
@@ -4569,6 +4580,10 @@ void nano::rpc_handler::process_request ()
 			else if (action == "bootstrap_status")
 			{
 				bootstrap_status ();
+			}
+			else if (action == "bootstrap_max_set")
+			{
+				bootstrap_max_set ();
 			}
 			else if (action == "chain")
 			{

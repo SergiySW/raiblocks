@@ -121,6 +121,7 @@ public:
 	void bootstrap_any ();
 	void bootstrap_lazy ();
 	void bootstrap_status ();
+	void bootstrap_max_set ();
 	void chain (bool = false);
 	void confirmation_active ();
 	void confirmation_history ();
