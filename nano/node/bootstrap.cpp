@@ -1941,6 +1941,7 @@ void nano::bootstrap_listener::start ()
 {
 	acceptor.open (local.protocol ());
 	acceptor.set_option (boost::asio::ip::tcp::acceptor::reuse_address (true));
+	acceptor.max_listen_connections = node.config.bootstrap_connections_max;
 
 	boost::system::error_code ec;
 	acceptor.bind (local, ec);
