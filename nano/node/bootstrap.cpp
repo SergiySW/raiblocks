@@ -2097,7 +2097,15 @@ void nano::bootstrap_server::receive_frontier_req_action (boost::system::error_c
 			{
 				node->logger.try_log (boost::str (boost::format ("Received frontier request for %1% with age %2%") % request->start.to_string () % request->age));
 			}
-			add_request (std::unique_ptr<nano::message> (request.release ()));
+			if (!bootstrap_connection && !node->flags.disable_bootstrap_listener && node->bootstrap.bootstrap_count < node->config.bootstrap_connections_max)
+			{
+				++node->bootstrap.bootstrap_count;
+				bootstrap_connection = true;
+			}
+			if (bootstrap_connection)
+			{
+				add_request (std::unique_ptr<nano::message> (request.release ()));
+			}
 			receive ();
 		}
 	}
@@ -2141,19 +2149,7 @@ void nano::bootstrap_server::receive_publish_action (boost::system::error_code c
 		std::unique_ptr<nano::publish> request (new nano::publish (error, stream, header_a));
 		if (!error)
 		{
-			if (node->config.logging.bulk_pull_logging ())
-			{
-				node->logger.try_log (boost::str (boost::format ("Received frontier request for %1% with age %2%") % request->start.to_string () % request->age));
-			}
-			if (!bootstrap_connection && !node->flags.disable_bootstrap_listener && node->bootstrap.bootstrap_count < node->config.bootstrap_connections_max)
-			{
-				++node->bootstrap.bootstrap_count;
-				bootstrap_connection = true;
-			}
-			if (bootstrap_connection)
-			{
-				add_request (std::unique_ptr<nano::message> (request.release ()));
-			}
+			add_request (std::unique_ptr<nano::message> (request.release ()));
 			receive ();
 		}
 	}

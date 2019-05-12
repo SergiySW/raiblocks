@@ -33,7 +33,7 @@ bool nano::transport::channel_udp::operator== (nano::transport::channel const & 
 void nano::transport::channel_udp::send_buffer (std::shared_ptr<std::vector<uint8_t>> buffer_a, nano::stat::detail detail_a, std::function<void(boost::system::error_code const &, size_t)> const & callback_a)
 {
 	set_last_packet_sent (std::chrono::steady_clock::now ());
-	channels.send (buffer_a, endpoint, callback_a);
+	channels.send (boost::asio::const_buffer (buffer_a->data (), buffer_a->size ()), endpoint, callback_a);
 }
 
 std::function<void(boost::system::error_code const &, size_t)> nano::transport::channel_udp::callback (std::shared_ptr<std::vector<uint8_t>> buffer_a, nano::stat::detail detail_a, std::function<void(boost::system::error_code const &, size_t)> const & callback_a) const
