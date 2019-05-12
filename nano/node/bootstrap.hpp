@@ -278,6 +278,7 @@ public:
 	nano::node & node;
 	std::shared_ptr<nano::server_socket> listening_socket;
 	bool on;
+	std::atomic<size_t> bootstrap_count{ 0 };
 
 private:
 	uint16_t port;
@@ -310,6 +311,7 @@ public:
 	std::shared_ptr<nano::node> node;
 	std::mutex mutex;
 	std::queue<std::unique_ptr<nano::message>> requests;
+	std::atomic<bool> bootstrap_connection{ false };
 };
 class bulk_pull;
 class bulk_pull_server final : public std::enable_shared_from_this<nano::bulk_pull_server>
