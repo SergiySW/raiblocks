@@ -149,7 +149,6 @@ TEST (wallets, reload)
 	ASSERT_EQ (1, system.nodes[0]->wallets.items.size ());
 	{
 		std::lock_guard<std::mutex> lock_wallet (system.nodes[0]->wallets.mutex);
-		std::lock_guard<std::mutex> lock_store (system.nodes[0]->wallets.store.mutex);
 		nano::inactive_node node (system.nodes[0]->application_path, 24001);
 		auto wallet (node.node->wallets.create (one));
 		ASSERT_NE (wallet, nullptr);
