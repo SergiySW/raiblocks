@@ -40,8 +40,10 @@ std::shared_ptr<nano::node> nano::system::add_node (nano::node_config const & no
 			auto node1 (*i);
 			auto node2 (*j);
 			auto starting1 (node1->network.size ());
+			auto response_starting1 (node1->network.response_channels_size ());
 			decltype (starting1) new1;
 			auto starting2 (node2->network.size ());
+			auto response_starting2 (node2->network.response_channels_size ());
 			decltype (starting2) new2;
 			if (type_a == nano::transport::transport_type::tcp)
 			{
@@ -59,6 +61,17 @@ std::shared_ptr<nano::node> nano::system::add_node (nano::node_config const & no
 				new1 = node1->network.size ();
 				new2 = node2->network.size ();
 			} while (new1 == starting1 || new2 == starting2);
+			if (type_a == nano::transport::transport_type::tcp)
+			{
+				decltype (response_starting1) response_new1;
+				decltype (response_starting2) response_new2;
+				do
+				{
+					poll ();
+					response_new1 = node1->network.response_channels_size ();
+					response_new2 = node2->network.response_channels_size ();
+				} while (response_new1 == response_starting1 || response_new2 == response_starting2);
+			}
 		}
 		auto iterations1 (0);
 		while (std::any_of (begin, nodes.end (), [](std::shared_ptr<nano::node> const & node_a) { return node_a->bootstrap_initiator.in_progress (); }))
