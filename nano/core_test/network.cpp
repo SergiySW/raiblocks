@@ -2026,8 +2026,6 @@ TEST (confirmation_height, all_block_types)
 /* Bulk of the this test was taken from the node.fork_flip test */
 TEST (confirmation_height, conflict_rollback_cemented)
 {
-	std::stringstream ss;
-	nano::boost_log_cerr_redirect redirect_cerr (ss.rdbuf ());
 	nano::system system (24000, 2);
 	auto & node1 (*system.nodes[0]);
 	auto & node2 (*system.nodes[1]);
@@ -2077,6 +2075,14 @@ TEST (confirmation_height, conflict_rollback_cemented)
 		node2.store.account_get (transaction, nano::genesis_account, info);
 		info.confirmation_height = 2;
 		node1.store.account_put (transaction, nano::genesis_account, info);
+	}
+
+	std::stringstream ss;
+	{
+		lock.lock ();
+		std::lock_guard<std::mutex> lock1 (node1.active.mutex);
+		nano::boost_log_cerr_redirect redirect_cerr (ss.rdbuf ());
+		lock.unlock ();
 	}
 
 	auto rollback_log_entry = boost::str (boost::format ("Failed to roll back %1%") % send2->hash ().to_string ());
