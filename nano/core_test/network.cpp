@@ -2086,7 +2086,7 @@ TEST (confirmation_height, conflict_rollback_cemented)
 	}
 
 	auto rollback_log_entry = boost::str (boost::format ("Failed to roll back %1%") % send2->hash ().to_string ());
-	system.deadline_set (10s);
+	system.deadline_set (20s);
 	auto done (false);
 	while (!done)
 	{
