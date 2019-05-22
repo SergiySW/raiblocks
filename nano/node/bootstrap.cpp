@@ -1946,8 +1946,10 @@ void nano::bootstrap_server::receive_header_action (boost::system::error_code co
 		nano::bufferstream type_stream (receive_buffer->data (), size_a);
 		auto error (false);
 		nano::message_header header (error, type_stream);
+		std::cout << "Received header" << std::endl;
 		if (!error)
 		{
+			std::cout << "valid header" << std::endl;
 			switch (header.type)
 			{
 				case nano::message_type::bulk_pull:
