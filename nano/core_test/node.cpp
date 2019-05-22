@@ -1867,6 +1867,7 @@ TEST (node, send_callback)
 TEST (node, vote_replay)
 {
 	nano::system system (24000, 2);
+	std::cout << "system finished" << std::endl;
 	nano::keypair key;
 	auto open (std::make_shared<nano::open_block> (0, 1, key.pub, key.prv, key.pub, 0));
 	system.nodes[0]->work_generate_blocking (*open);
