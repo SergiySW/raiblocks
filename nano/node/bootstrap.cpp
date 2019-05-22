@@ -2025,9 +2025,9 @@ void nano::bootstrap_server::receive_header_action (boost::system::error_code co
 				}
 				case nano::message_type::confirm_req:
 				{
-					std::cout << "message_type::confirm_req " << header.extensions << " size " << (header.payload_length_bytes () + 8)<< std::endl;
+					std::cout << "message_type::confirm_req " << header.extensions << " size " << (header.payload_length_bytes () + 8) << std::endl;
 					auto this_l (shared_from_this ());
-					socket->async_read (receive_buffer, header.payload_length_bytes (), [this_l, header](boost::system::error_code const & ec, size_t size_a) {
+					socket->async_read (receive_buffer, header.payload_length_bytes (), [this_l, header, receive_buffer](boost::system::error_code const & ec, size_t size_a) {
 						this_l->receive_confirm_req_action (ec, size_a, header);
 					});
 					break;
