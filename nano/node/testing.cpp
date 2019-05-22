@@ -61,7 +61,6 @@ std::shared_ptr<nano::node> nano::system::add_node (nano::node_config const & no
 				new1 = node1->network.size ();
 				new2 = node2->network.size ();
 			} while (new1 == starting1 || new2 == starting2);
-			std::cout << new1 << " " << new2 << std::endl;
 			if (type_a == nano::transport::transport_type::tcp)
 			{
 				// Wait for initial connection finish
@@ -74,6 +73,7 @@ std::shared_ptr<nano::node> nano::system::add_node (nano::node_config const & no
 					new_listener2 = node2->bootstrap.bootstrap_count;
 				} while (new_listener1 == starting_listener1 || new_listener2 == starting_listener2);
 			}
+			std::cout << new1 << " " << new2 << std::endl;
 		}
 		auto iterations1 (0);
 		while (std::any_of (begin, nodes.end (), [](std::shared_ptr<nano::node> const & node_a) { return node_a->bootstrap_initiator.in_progress (); }))
