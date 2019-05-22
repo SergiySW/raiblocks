@@ -1895,10 +1895,12 @@ nano::bootstrap_server::~bootstrap_server ()
 	}
 	if (bootstrap_connection)
 	{
+		std::cout << "close bootstrap" << std::endl;
 		--node->bootstrap.bootstrap_count;
 	}
 	if (node_id_handshake_finished)
 	{
+		std::cout << "close realtime" << std::endl;
 		--node->bootstrap.realtime_count;
 		node->network.remove_response_channel (remote_endpoint);
 	}
