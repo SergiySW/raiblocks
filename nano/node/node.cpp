@@ -2609,7 +2609,7 @@ void nano::network::cleanup (std::chrono::steady_clock::time_point const & cutof
 
 void nano::network::ongoing_cleanup ()
 {
-	cleanup (std::chrono::steady_clock::now () - node.network_params.node.cutoff);
+	cleanup (std::chrono::steady_clock::now () - node.network_params.node.cutoff * 2);
 	std::weak_ptr<nano::node> node_w (node.shared ());
 	node.alarm.add (std::chrono::steady_clock::now () + node.network_params.node.period, [node_w]() {
 		if (auto node_l = node_w.lock ())
