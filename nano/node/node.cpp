@@ -271,9 +271,11 @@ bool nano::network::send_votes_cache (std::shared_ptr<nano::transport::channel> 
 
 void nano::network::flood_message (nano::message const & message_a)
 {
-	auto list (node.network.list_fanout ());
+	auto list (list_fanout ());
+	std::cout << "list size " << list.size () << std::endl;
 	for (auto i (list.begin ()), n (list.end ()); i != n; ++i)
 	{
+		std::cout << "send flood" << std::endl;
 		(*i)->send (message_a);
 	}
 }
