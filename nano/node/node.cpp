@@ -276,11 +276,11 @@ void nano::network::flood_message (nano::message const & message_a)
 	for (auto i (list.begin ()), n (list.end ()); i != n; ++i)
 	{
 		std::cout << "send flood, tcp: " << bool ((*i)->get_type () == nano::transport::transport_type::tcp) << std::endl;
-		if (message.header.type == nano::message_type::publish)
+		if (message_a.header.type == nano::message_type::publish)
 		{
 			std::cout << "type: publish" << std::endl;
 		}
-		else if (message.header.type == nano::message_type::confirm_ack)
+		else if (message_a.header.type == nano::message_type::confirm_ack)
 		{
 			std::cout << "type: confirm_ack" << std::endl;
 		}
