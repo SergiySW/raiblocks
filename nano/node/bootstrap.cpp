@@ -2436,6 +2436,7 @@ public:
 			connection->remote_node_id = message_a.response->first;
 			if (!connection->node->network.tcp_channels.validate_syn_cookie (connection->remote_endpoint, connection->remote_node_id, message_a.response->second) && connection->remote_node_id != connection->node->node_id.pub)
 			{
+				std::cout << "node_id_handshake_finished" << std::endl;
 				connection->node_id_handshake_finished = true;
 				++connection->node->bootstrap.realtime_count;
 				connection->finish_request_async ();
