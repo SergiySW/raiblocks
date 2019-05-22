@@ -2241,6 +2241,7 @@ void nano::bootstrap_server::receive_node_id_handshake_action (boost::system::er
 		{
 			if (!node_id_handshake_finished)
 			{
+				std::cout << "add_request node_id_handshake" << std::endl;
 				add_request (std::unique_ptr<nano::message> (request.release ()));
 			}
 			receive ();
