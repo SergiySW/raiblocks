@@ -103,6 +103,7 @@ void nano::rep_crawler::query (std::vector<std::shared_ptr<nano::transport::chan
 	{
 		on_rep_request (*i);
 		nano::confirm_req message (block);
+		std::cout << "send confirm_req crawler" << std::endl;
 		(*i)->send (message);
 	}
 

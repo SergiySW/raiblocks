@@ -340,6 +340,7 @@ void nano::network::broadcast_confirm_req_base (std::shared_ptr<nano::block> blo
 	{
 		nano::confirm_req req (block_a);
 		auto channel (endpoints_a->back ());
+		std::cout << "send confirm_req" << std::endl;
 		channel->send (req);
 		endpoints_a->pop_back ();
 		count++;
@@ -379,6 +380,7 @@ void nano::network::broadcast_confirm_req_batch (std::unordered_map<std::shared_
 		}
 		nano::confirm_req req (roots_hashes);
 		j->first->send (req);
+		std::cout << "send confirm_req" << std::endl;
 		if (j->second.empty ())
 		{
 			request_bundle_a.erase (j);
