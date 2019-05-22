@@ -2211,6 +2211,7 @@ void nano::bootstrap_server::receive_confirm_ack_action (boost::system::error_co
 	}
 	else if (node->config.logging.network_message_logging ())
 	{
+		std::cout << boost::str (boost::format ("Error receiving confirm_ack: %1%") % ec.message ()) << std::endl;
 		node->logger.try_log (boost::str (boost::format ("Error receiving confirm_ack: %1%") % ec.message ()));
 	}
 }
