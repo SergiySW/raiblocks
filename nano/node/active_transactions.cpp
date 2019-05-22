@@ -415,6 +415,7 @@ bool nano::active_transactions::vote (std::shared_ptr<nano::vote> vote_a, bool s
 	}
 	if (processed)
 	{
+		std::cout << "flood_vote" << std::endl;
 		node.network.flood_vote (vote_a);
 	}
 	return replay;
