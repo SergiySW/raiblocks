@@ -355,7 +355,7 @@ void nano::transport::tcp_channels::purge (std::chrono::steady_clock::time_point
 {
 	std::lock_guard<std::mutex> lock (mutex);
 	auto disconnect_cutoff (channels.get<last_packet_sent_tag> ().lower_bound (cutoff_a));
-	channels.get<last_packet_sent_tag> ().erase (channels.get<last_packet_sent_tag> ().begin (), disconnect_cutoff);
+	//channels.get<last_packet_sent_tag> ().erase (channels.get<last_packet_sent_tag> ().begin (), disconnect_cutoff);
 	// Remove keepalive attempt tracking for attempts older than cutoff
 	auto attempts_cutoff (attempts.get<1> ().lower_bound (cutoff_a));
 	attempts.get<1> ().erase (attempts.get<1> ().begin (), attempts_cutoff);
