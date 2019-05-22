@@ -371,6 +371,7 @@ void nano::block_processor::process_live (nano::block_hash const & hash_a, std::
 			// Request votes
 			if (send_request)
 			{
+				std::cout << "broadcast_confirm_req" << std::endl;
 				node_l->network.broadcast_confirm_req (block_a);
 			}
 		}
