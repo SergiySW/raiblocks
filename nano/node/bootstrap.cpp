@@ -2028,6 +2028,7 @@ void nano::bootstrap_server::receive_header_action (boost::system::error_code co
 				}
 				default:
 				{
+					std::cout << "Received invalid type" << std::endl;
 					if (node->config.logging.network_logging ())
 					{
 						node->logger.try_log (boost::str (boost::format ("Received invalid type from bootstrap connection %1%") % static_cast<uint8_t> (header.type)));
