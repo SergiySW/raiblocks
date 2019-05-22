@@ -1,3 +1,4 @@
+#include <boost/iostreams/stream_buffer.hpp>
 #include <boost/thread.hpp>
 #include <gtest/gtest.h>
 #include <nano/core_test/testutil.hpp>
@@ -1228,7 +1229,10 @@ TEST (network, endpoint_bad_fd)
 TEST (network, reserved_address)
 {
 	nano::system system (24000, 1);
-	ASSERT_FALSE (nano::transport::reserved_address (nano::endpoint (boost::asio::ip::address_v6::from_string ("2001::"), 0)));
+	// 0 port test
+	ASSERT_TRUE (nano::transport::reserved_address (nano::endpoint (boost::asio::ip::address_v6::from_string ("2001::"), 0)));
+	// Valid address test
+	ASSERT_FALSE (nano::transport::reserved_address (nano::endpoint (boost::asio::ip::address_v6::from_string ("2001::"), 1)));
 	nano::endpoint loopback (boost::asio::ip::address_v6::from_string ("::1"), 1);
 	ASSERT_FALSE (nano::transport::reserved_address (loopback));
 	nano::endpoint private_network_peer (boost::asio::ip::address_v6::from_string ("::ffff:10.0.0.0"), 1);
@@ -2026,6 +2030,9 @@ TEST (confirmation_height, all_block_types)
 /* Bulk of the this test was taken from the node.fork_flip test */
 TEST (confirmation_height, conflict_rollback_cemented)
 {
+	boost::iostreams::stream_buffer<nano::stringstream_mt_sink> sb;
+	sb.open (nano::stringstream_mt_sink{});
+	nano::boost_log_cerr_redirect redirect_cerr (&sb);
 	nano::system system (24000, 2);
 	auto & node1 (*system.nodes[0]);
 	auto & node2 (*system.nodes[1]);
@@ -2077,21 +2084,13 @@ TEST (confirmation_height, conflict_rollback_cemented)
 		node1.store.account_put (transaction, nano::genesis_account, info);
 	}
 
-	std::stringstream ss;
-	{
-		lock.lock ();
-		std::lock_guard<std::mutex> lock1 (node1.active.mutex);
-		nano::boost_log_cerr_redirect redirect_cerr (ss.rdbuf ());
-		lock.unlock ();
-	}
-
 	auto rollback_log_entry = boost::str (boost::format ("Failed to roll back %1%") % send2->hash ().to_string ());
 	system.deadline_set (20s);
 	auto done (false);
 	while (!done)
 	{
 		ASSERT_NO_ERROR (system.poll ());
-		done = (ss.str ().find (rollback_log_entry) != std::string::npos);
+		done = (sb.component ()->str ().find (rollback_log_entry) != std::string::npos);
 	}
 	auto transaction1 (system.nodes[0]->store.tx_begin_read ());
 	auto transaction2 (system.nodes[1]->store.tx_begin_read ());

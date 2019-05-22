@@ -478,6 +478,10 @@ void nano::transport::udp_channels::receive_action (nano::message_buffer * data_
 	{
 		allowed_sender = false;
 	}
+	else if (data_a->endpoint.address ().to_v6 ().is_unspecified ())
+	{
+		allowed_sender = false;
+	}
 	else if (nano::transport::reserved_address (data_a->endpoint, node.config.allow_local_peers))
 	{
 		allowed_sender = false;
@@ -539,9 +543,9 @@ void nano::transport::udp_channels::receive_action (nano::message_buffer * data_
 	}
 	else
 	{
-		if (node.config.logging.network_logging ())
+		if (node.config.logging.network_packet_logging ())
 		{
-			node.logger.try_log (boost::str (boost::format ("Reserved sender %1%") % data_a->endpoint.address ().to_string ()));
+			node.logger.try_log (boost::str (boost::format ("Reserved sender %1%") % data_a->endpoint));
 		}
 
 		node.stats.inc_detail_only (nano::stat::type::error, nano::stat::detail::bad_sender);
