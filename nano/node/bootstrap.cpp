@@ -2196,6 +2196,7 @@ void nano::bootstrap_server::receive_confirm_ack_action (boost::system::error_co
 {
 	if (!ec)
 	{
+		std::cout << "receive_confirm_ack_action" << std::endl;
 		auto error (false);
 		nano::bufferstream stream (receive_buffer->data (), size_a);
 		std::unique_ptr<nano::confirm_ack> request (new nano::confirm_ack (error, stream, header_a));
@@ -2347,6 +2348,7 @@ public:
 		connection->finish_request_async ();
 		auto connection_l (connection->shared_from_this ());
 		connection->node->background ([connection_l, message_a]() {
+			std::cout << "process confirm_ack" << std::endl;
 			connection_l->node->network.tcp_channels.process_message (message_a, connection_l->remote_endpoint, connection_l->remote_node_id);
 		});
 	}
