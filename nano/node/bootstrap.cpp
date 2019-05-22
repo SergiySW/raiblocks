@@ -2055,9 +2055,9 @@ void nano::bootstrap_server::receive_header_action (boost::system::error_code co
 
 void nano::bootstrap_server::receive_bulk_pull_action (boost::system::error_code const & ec, size_t size_a, nano::message_header const & header_a)
 {
+	std::cout << "receive_bulk_pull_action " << ec.message () << std::endl;
 	if (!ec)
 	{
-		std::cout << "receive_bulk_pull_action" << std::endl;
 		auto error (false);
 		nano::bufferstream stream (receive_buffer->data (), size_a);
 		std::unique_ptr<nano::bulk_pull> request (new nano::bulk_pull (error, stream, header_a));
@@ -2078,9 +2078,9 @@ void nano::bootstrap_server::receive_bulk_pull_action (boost::system::error_code
 
 void nano::bootstrap_server::receive_bulk_pull_account_action (boost::system::error_code const & ec, size_t size_a, nano::message_header const & header_a)
 {
+	std::cout << "receive_bulk_pull_account_action " << ec.message () << std::endl;
 	if (!ec)
 	{
-		std::cout << "receive_bulk_pull_account_action" << std::endl;
 		auto error (false);
 		assert (size_a == header_a.payload_length_bytes ());
 		nano::bufferstream stream (receive_buffer->data (), size_a);
@@ -2102,9 +2102,9 @@ void nano::bootstrap_server::receive_bulk_pull_account_action (boost::system::er
 
 void nano::bootstrap_server::receive_frontier_req_action (boost::system::error_code const & ec, size_t size_a, nano::message_header const & header_a)
 {
+	std::cout << "receive_frontier_req_action " << ec.message () << std::endl;
 	if (!ec)
 	{
-		std::cout << "receive_frontier_req_action" << std::endl;
 		auto error (false);
 		nano::bufferstream stream (receive_buffer->data (), size_a);
 		std::unique_ptr<nano::frontier_req> request (new nano::frontier_req (error, stream, header_a));
@@ -2132,9 +2132,9 @@ void nano::bootstrap_server::receive_frontier_req_action (boost::system::error_c
 
 void nano::bootstrap_server::receive_keepalive_action (boost::system::error_code const & ec, size_t size_a, nano::message_header const & header_a)
 {
+	std::cout << "receive_keepalive_action " << ec.message () << std::endl;
 	if (!ec)
 	{
-		std::cout << "receive_keepalive_action" << std::endl;
 		auto error (false);
 		nano::bufferstream stream (receive_buffer->data (), size_a);
 		std::unique_ptr<nano::keepalive> request (new nano::keepalive (error, stream, header_a));
@@ -2158,9 +2158,9 @@ void nano::bootstrap_server::receive_keepalive_action (boost::system::error_code
 
 void nano::bootstrap_server::receive_publish_action (boost::system::error_code const & ec, size_t size_a, nano::message_header const & header_a)
 {
+	std::cout << "receive_publish_action " << ec.message () << std::endl;
 	if (!ec)
 	{
-		std::cout << "receive_publish_action" << std::endl;
 		auto error (false);
 		nano::bufferstream stream (receive_buffer->data (), size_a);
 		std::unique_ptr<nano::publish> request (new nano::publish (error, stream, header_a));
@@ -2185,9 +2185,9 @@ void nano::bootstrap_server::receive_publish_action (boost::system::error_code c
 
 void nano::bootstrap_server::receive_confirm_req_action (boost::system::error_code const & ec, size_t size_a, nano::message_header const & header_a)
 {
+	std::cout << "receive_confirm_req_action " << ec.message () << std::endl;
 	if (!ec)
 	{
-		std::cout << "receive_confirm_req_action" << std::endl;
 		auto error (false);
 		nano::bufferstream stream (receive_buffer->data (), size_a);
 		std::unique_ptr<nano::confirm_req> request (new nano::confirm_req (error, stream, header_a));
@@ -2208,9 +2208,9 @@ void nano::bootstrap_server::receive_confirm_req_action (boost::system::error_co
 
 void nano::bootstrap_server::receive_confirm_ack_action (boost::system::error_code const & ec, size_t size_a, nano::message_header const & header_a)
 {
+	std::cout << "receive_confirm_ack_action " << ec.message () << std::endl;
 	if (!ec)
 	{
-		std::cout << "receive_confirm_ack_action" << std::endl;
 		auto error (false);
 		nano::bufferstream stream (receive_buffer->data (), size_a);
 		std::unique_ptr<nano::confirm_ack> request (new nano::confirm_ack (error, stream, header_a));
@@ -2235,9 +2235,9 @@ void nano::bootstrap_server::receive_confirm_ack_action (boost::system::error_co
 
 void nano::bootstrap_server::receive_node_id_handshake_action (boost::system::error_code const & ec, size_t size_a, nano::message_header const & header_a)
 {
+	std::cout << "receive_node_id_handshake_action " << ec.message () << std::endl;
 	if (!ec)
 	{
-		std::cout << "receive_node_id_handshake_action" << std::endl;
 		auto error (false);
 		nano::bufferstream stream (receive_buffer->data (), size_a);
 		std::unique_ptr<nano::node_id_handshake> request (new nano::node_id_handshake (error, stream, header_a));
