@@ -1874,6 +1874,7 @@ TEST (node, vote_replay)
 	{
 		auto transaction (system.nodes[1]->store.tx_begin_read ());
 		auto vote (system.nodes[1]->store.vote_generate (transaction, nano::test_genesis_key.pub, nano::test_genesis_key.prv, open));
+		ASSERT_EQ (i + 1, vote->sequence);
 	}
 	{
 		auto transaction (system.nodes[0]->store.tx_begin_read ());
