@@ -9,6 +9,7 @@ socket (socket_a)
 
 nano::transport::channel_tcp::~channel_tcp ()
 {
+	std::cout << "close tcp channel" << std::endl;
 	std::lock_guard<std::mutex> lk (channel_mutex);
 	if (socket)
 	{
