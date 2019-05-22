@@ -275,7 +275,7 @@ void nano::network::flood_message (nano::message const & message_a)
 	std::cout << "list size " << list.size () << " " << size () << std::endl;
 	for (auto i (list.begin ()), n (list.end ()); i != n; ++i)
 	{
-		std::cout << "send flood, tcp: " << bool ((*i)->get_type () == nano::transport::transport_type::tcp) << std::endl;
+		std::cout << "send flood, tcp: " << bool ((*i)->get_type () == nano::transport::transport_type::tcp) << " type " << static_cast<uint8_t> (message_a.header.type) << std::endl;
 		(*i)->send (message_a);
 	}
 }
