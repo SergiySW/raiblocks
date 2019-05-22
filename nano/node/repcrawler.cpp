@@ -102,7 +102,8 @@ void nano::rep_crawler::query (std::vector<std::shared_ptr<nano::transport::chan
 	for (auto i (channels_a.begin ()), n (channels_a.end ()); i != n; ++i)
 	{
 		on_rep_request (*i);
-		nano::confirm_req message (block);
+		//nano::confirm_req message (block);
+		nano::confirm_req message (hash, block->root ());
 		std::cout << "send confirm_req crawler " << hash.to_string () << " " << message.header.extensions << std::endl;
 		(*i)->send (message);
 	}
