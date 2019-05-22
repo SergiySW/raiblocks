@@ -1886,6 +1886,7 @@ TEST (node, vote_replay)
 	ASSERT_EQ (1, system.nodes[0]->network.size ());
 	ASSERT_EQ (1, system.nodes[1]->network.size ());
 	system.wallet (0)->insert_adhoc (nano::test_genesis_key.prv);
+	std::this_thread::sleep_for (std::chrono::seconds (2));
 	auto block (system.wallet (0)->send_action (nano::test_genesis_key.pub, key.pub, nano::Gxrb_ratio));
 	ASSERT_NE (nullptr, block);
 	auto done (false);
