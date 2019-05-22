@@ -2150,6 +2150,7 @@ void nano::bootstrap_server::receive_publish_action (boost::system::error_code c
 {
 	if (!ec)
 	{
+		std::cout << "receive_publish_action" << std::endl;
 		auto error (false);
 		nano::bufferstream stream (receive_buffer->data (), size_a);
 		std::unique_ptr<nano::publish> request (new nano::publish (error, stream, header_a));
@@ -2164,6 +2165,7 @@ void nano::bootstrap_server::receive_publish_action (boost::system::error_code c
 	}
 	else
 	{
+		std::cout << boost::str (boost::format ("Error receiving publish: %1%") % ec.message ()) << std::endl;
 		if (node->config.logging.network_message_logging ())
 		{
 			node->logger.try_log (boost::str (boost::format ("Error receiving publish: %1%") % ec.message ()));
@@ -2212,8 +2214,11 @@ void nano::bootstrap_server::receive_confirm_ack_action (boost::system::error_co
 	}
 	else if (node->config.logging.network_message_logging ())
 	{
-		std::cout << boost::str (boost::format ("Error receiving confirm_ack: %1%") % ec.message ()) << std::endl;
 		node->logger.try_log (boost::str (boost::format ("Error receiving confirm_ack: %1%") % ec.message ()));
+	}
+	else
+	{
+		std::cout << boost::str (boost::format ("Error receiving confirm_ack: %1%") % ec.message ()) << std::endl;
 	}
 }
 
