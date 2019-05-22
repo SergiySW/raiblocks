@@ -2053,6 +2053,7 @@ void nano::bootstrap_server::receive_bulk_pull_action (boost::system::error_code
 {
 	if (!ec)
 	{
+		std::cout << "receive_bulk_pull_action" << std::endl;
 		auto error (false);
 		nano::bufferstream stream (receive_buffer->data (), size_a);
 		std::unique_ptr<nano::bulk_pull> request (new nano::bulk_pull (error, stream, header_a));
@@ -2075,6 +2076,7 @@ void nano::bootstrap_server::receive_bulk_pull_account_action (boost::system::er
 {
 	if (!ec)
 	{
+		std::cout << "receive_bulk_pull_account_action" << std::endl;
 		auto error (false);
 		assert (size_a == header_a.payload_length_bytes ());
 		nano::bufferstream stream (receive_buffer->data (), size_a);
@@ -2098,6 +2100,7 @@ void nano::bootstrap_server::receive_frontier_req_action (boost::system::error_c
 {
 	if (!ec)
 	{
+		std::cout << "receive_frontier_req_action" << std::endl;
 		auto error (false);
 		nano::bufferstream stream (receive_buffer->data (), size_a);
 		std::unique_ptr<nano::frontier_req> request (new nano::frontier_req (error, stream, header_a));
@@ -2127,6 +2130,7 @@ void nano::bootstrap_server::receive_keepalive_action (boost::system::error_code
 {
 	if (!ec)
 	{
+		std::cout << "receive_keepalive_action" << std::endl;
 		auto error (false);
 		nano::bufferstream stream (receive_buffer->data (), size_a);
 		std::unique_ptr<nano::keepalive> request (new nano::keepalive (error, stream, header_a));
@@ -2179,6 +2183,7 @@ void nano::bootstrap_server::receive_confirm_req_action (boost::system::error_co
 {
 	if (!ec)
 	{
+		std::cout << "receive_confirm_req_action" << std::endl;
 		auto error (false);
 		nano::bufferstream stream (receive_buffer->data (), size_a);
 		std::unique_ptr<nano::confirm_req> request (new nano::confirm_req (error, stream, header_a));
@@ -2228,6 +2233,7 @@ void nano::bootstrap_server::receive_node_id_handshake_action (boost::system::er
 {
 	if (!ec)
 	{
+		std::cout << "receive_node_id_handshake_action" << std::endl;
 		auto error (false);
 		nano::bufferstream stream (receive_buffer->data (), size_a);
 		std::unique_ptr<nano::node_id_handshake> request (new nano::node_id_handshake (error, stream, header_a));
