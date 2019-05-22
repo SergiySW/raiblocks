@@ -507,49 +507,52 @@ void nano::transport::tcp_channels::update (nano::tcp_endpoint const & endpoint_
 
 void nano::transport::tcp_channels::start_tcp (nano::endpoint const & endpoint_a, std::function<void(std::shared_ptr<nano::transport::channel>)> const & callback_a)
 {
-	auto socket (std::make_shared<nano::socket> (node.shared_from_this (), boost::none, nano::socket::concurrency::multi_writer));
-	auto channel (std::make_shared<nano::transport::channel_tcp> (node, socket));
-	std::weak_ptr<nano::node> node_w (node.shared ());
-	channel->socket->async_connect (nano::transport::map_endpoint_to_tcp (endpoint_a),
-	[node_w, channel, endpoint_a, callback_a](boost::system::error_code const & ec) {
-		if (auto node_l = node_w.lock ())
-		{
-			if (!ec && channel)
+	if (!stopped)
+	{
+		auto socket (std::make_shared<nano::socket> (node.shared (), boost::none, nano::socket::concurrency::multi_writer));
+		auto channel (std::make_shared<nano::transport::channel_tcp> (node, socket));
+		std::weak_ptr<nano::node> node_w (node.shared ());
+		channel->socket->async_connect (nano::transport::map_endpoint_to_tcp (endpoint_a),
+		[node_w, channel, endpoint_a, callback_a](boost::system::error_code const & ec) {
+			if (auto node_l = node_w.lock ())
 			{
-				// TCP node ID handshake
-				auto cookie (node_l->network.tcp_channels.assign_syn_cookie (nano::transport::map_endpoint_to_tcp (endpoint_a)));
-				nano::node_id_handshake message (cookie, boost::none);
-				auto bytes = message.to_bytes ();
-				if (node_l->config.logging.network_node_id_handshake_logging ())
+				if (!ec && channel)
 				{
-					node_l->logger.try_log (boost::str (boost::format ("Node ID handshake request sent with node ID %1% to %2%: query %3%") % node_l->node_id.pub.to_account () % endpoint_a % (*cookie).to_string ()));
-				}
-				std::shared_ptr<std::vector<uint8_t>> receive_buffer (std::make_shared<std::vector<uint8_t>> ());
-				receive_buffer->resize (256);
-				channel->send_buffer (bytes, nano::stat::detail::node_id_handshake, [node_w, channel, endpoint_a, receive_buffer, callback_a](boost::system::error_code const & ec, size_t size_a) {
-					if (auto node_l = node_w.lock ())
+					// TCP node ID handshake
+					auto cookie (node_l->network.tcp_channels.assign_syn_cookie (nano::transport::map_endpoint_to_tcp (endpoint_a)));
+					nano::node_id_handshake message (cookie, boost::none);
+					auto bytes = message.to_bytes ();
+					if (node_l->config.logging.network_node_id_handshake_logging ())
 					{
-						if (!ec && channel)
-						{
-							node_l->network.tcp_channels.start_tcp_receive_node_id (channel, endpoint_a, receive_buffer, callback_a);
-						}
-						else
-						{
-							if (node_l->config.logging.network_node_id_handshake_logging ())
-							{
-								node_l->logger.try_log (boost::str (boost::format ("Error sending node_id_handshake to %1%: %2%") % endpoint_a % ec.message ()));
-							}
-							node_l->network.tcp_channels.udp_fallback (endpoint_a, callback_a);
-						}
+						node_l->logger.try_log (boost::str (boost::format ("Node ID handshake request sent with node ID %1% to %2%: query %3%") % node_l->node_id.pub.to_account () % endpoint_a % (*cookie).to_string ()));
 					}
-				});
+					std::shared_ptr<std::vector<uint8_t>> receive_buffer (std::make_shared<std::vector<uint8_t>> ());
+					receive_buffer->resize (256);
+					channel->send_buffer (bytes, nano::stat::detail::node_id_handshake, [node_w, channel, endpoint_a, receive_buffer, callback_a](boost::system::error_code const & ec, size_t size_a) {
+						if (auto node_l = node_w.lock ())
+						{
+							if (!ec && channel)
+							{
+								node_l->network.tcp_channels.start_tcp_receive_node_id (channel, endpoint_a, receive_buffer, callback_a);
+							}
+							else
+							{
+								if (node_l->config.logging.network_node_id_handshake_logging ())
+								{
+									node_l->logger.try_log (boost::str (boost::format ("Error sending node_id_handshake to %1%: %2%") % endpoint_a % ec.message ()));
+								}
+								node_l->network.tcp_channels.udp_fallback (endpoint_a, callback_a);
+							}
+						}
+					});
+				}
+				else
+				{
+					node_l->network.tcp_channels.udp_fallback (endpoint_a, callback_a);
+				}
 			}
-			else
-			{
-				node_l->network.tcp_channels.udp_fallback (endpoint_a, callback_a);
-			}
-		}
-	});
+		});
+	}
 }
 
 void nano::transport::tcp_channels::start_tcp_receive_node_id (std::shared_ptr<nano::transport::channel_tcp> channel_a, nano::endpoint const & endpoint_a, std::shared_ptr<std::vector<uint8_t>> receive_buffer_a, std::function<void(std::shared_ptr<nano::transport::channel>)> const & callback_a)
