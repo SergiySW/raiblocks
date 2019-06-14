@@ -78,6 +78,7 @@ protected:
 	std::atomic<bool> timed_out{ false };
 	boost::optional<std::chrono::seconds> io_timeout;
 	size_t const queue_size_max = 128;
+	std::atomic<uint64_t> tcp_write_drop_count{ 0 };
 
 	/** Set by close() - completion handlers must check this. This is more reliable than checking
 	 error codes as the OS may have already completed the async operation. */

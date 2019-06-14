@@ -76,6 +76,7 @@ void nano::socket::async_write (std::shared_ptr<std::vector<uint8_t>> buffer_a, 
 				else if (auto node_l = this_l->node.lock ())
 				{
 					node_l->stats.inc (nano::stat::type::tcp, nano::stat::detail::tcp_write_drop, nano::stat::dir::out);
+					++this_l->tcp_write_drop_count;
 				}
 				if (!write_in_progress)
 				{
@@ -222,6 +223,14 @@ void nano::socket::close_internal ()
 		closed = true;
 		io_timeout = boost::none;
 		boost::system::error_code ec;
+		// Debug information
+		if (tcp_write_drop_count != 0)
+		{
+			if (auto node_l = node.lock ())
+			{
+				node_l->logger.always_log (boost::str (boost::format ("%1% TCP packets dropped from queue for peer %2%") % tcp_write_drop_count % remote));
+			}
+		}
 
 		// Ignore error code for shutdown as it is best-effort
 		tcp_socket.shutdown (boost::asio::ip::tcp::socket::shutdown_both, ec);
