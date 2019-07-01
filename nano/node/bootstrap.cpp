@@ -754,7 +754,7 @@ count (count_a)
 {
 }
 
-nano::bootstrap_attempt::bootstrap_attempt (std::shared_ptr<nano::node> node_a) :
+nano::bootstrap_attempt::bootstrap_attempt (std::shared_ptr<nano::node> node_a, nano::bootstrap_mode mode_a) :
 next_log (std::chrono::steady_clock::now ()),
 connections (0),
 pulling (0),
@@ -763,7 +763,7 @@ account_count (0),
 total_blocks (0),
 runs_count (0),
 stopped (false),
-mode (nano::bootstrap_mode::legacy),
+mode (mode_a),
 lazy_stopped (0)
 {
 	node->logger.always_log ("Starting bootstrap attempt");
@@ -1703,8 +1703,7 @@ void nano::bootstrap_initiator::bootstrap_lazy (nano::block_hash const & hash_a,
 		node.stats.inc (nano::stat::type::bootstrap, nano::stat::detail::initiate_lazy, nano::stat::dir::out);
 		if (attempt == nullptr)
 		{
-			attempt = std::make_shared<nano::bootstrap_attempt> (node.shared ());
-			attempt->mode = nano::bootstrap_mode::lazy;
+			attempt = std::make_shared<nano::bootstrap_attempt> (node.shared (), nano::bootstrap_mode::lazy);
 		}
 		attempt->lazy_start (hash_a);
 	}
@@ -1718,8 +1717,7 @@ void nano::bootstrap_initiator::bootstrap_wallet (std::deque<nano::account> & ac
 		node.stats.inc (nano::stat::type::bootstrap, nano::stat::detail::initiate_wallet_lazy, nano::stat::dir::out);
 		if (attempt == nullptr)
 		{
-			attempt = std::make_shared<nano::bootstrap_attempt> (node.shared ());
-			attempt->mode = nano::bootstrap_mode::wallet_lazy;
+			attempt = std::make_shared<nano::bootstrap_attempt> (node.shared (), nano::bootstrap_mode::wallet_lazy);
 		}
 		attempt->wallet_start (accounts_a);
 	}
