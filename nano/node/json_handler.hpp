@@ -55,6 +55,7 @@ public:
 	void bootstrap_status ();
 	void chain (bool = false);
 	void confirmation_active ();
+	void confirmation_stuck ();
 	void confirmation_history ();
 	void confirmation_info ();
 	void confirmation_quorum ();

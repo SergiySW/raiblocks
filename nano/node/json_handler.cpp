@@ -1640,6 +1640,58 @@ void nano::json_handler::confirmation_active ()
 	response_l.add_child ("confirmations", elections);
 	response_errors ();
 }
+namespace
+{
+class confirmation_data final
+{
+public:
+	std::string address;
+	nano::amount weight;
+	uint64_t count;
+};
+}
+
+void nano::json_handler::confirmation_stuck ()
+{
+	std::unordered_map<nano::account, confirmation_data> representatives;
+	for (auto & peer : node.rep_crawler.representatives_by_weight ())
+	{
+		representatives.emplace (peer.account, confirmation_data{ peer.channel->to_string (), peer.weight, 0 });
+	}
+	{
+		std::lock_guard<std::mutex> lock (node.active.mutex);
+		for (auto i (node.active.roots.begin ()), n (node.active.roots.end ()); i != n; ++i)
+		{
+			if (i->election->confirmation_request_count > 0 && !i->election->confirmed && !i->election->stopped)
+			{
+				for (auto ii (representatives.begin ()), nn (representatives.end ()); ii != nn; ++ii)
+				{
+					if (i->election->last_votes.find (ii->first) == i->election->last_votes.end ())
+					{
+						++ii->second.count;
+					}
+				}
+			}
+		}
+	}
+	boost::property_tree::ptree representatives_info;
+	for (auto ii (representatives.begin ()), nn (representatives.end ()); ii != nn; ++ii)
+	{
+		if (ii->second.count > 0)
+		{
+			boost::property_tree::ptree entry;
+			entry.put ("count", ii->second.count);
+			entry.put ("weight", ii->second.weight.to_string_dec ());
+			entry.put ("address", ii->second.address);
+			representatives_info.add_child (ii->first.to_account (), entry);
+		}
+	}
+	representatives_info.sort ([](const auto & child1, const auto & child2) -> bool {
+		return child1.second.template get<uint64_t> ("count") > child2.second.template get<uint64_t> ("count");
+	});
+	response_l.add_child ("stuck_representatives", representatives_info);
+	response_errors ();
+}
 
 void nano::json_handler::confirmation_height_currently_processing ()
 {
@@ -4615,6 +4667,7 @@ ipc_json_handler_no_arg_func_map create_ipc_json_handler_no_arg_func_map ()
 	no_arg_funcs.emplace ("bootstrap_lazy", &nano::json_handler::bootstrap_lazy);
 	no_arg_funcs.emplace ("bootstrap_status", &nano::json_handler::bootstrap_status);
 	no_arg_funcs.emplace ("confirmation_active", &nano::json_handler::confirmation_active);
+	no_arg_funcs.emplace ("confirmation_stuck", &nano::json_handler::confirmation_stuck);
 	no_arg_funcs.emplace ("confirmation_height_currently_processing", &nano::json_handler::confirmation_height_currently_processing);
 	no_arg_funcs.emplace ("confirmation_history", &nano::json_handler::confirmation_history);
 	no_arg_funcs.emplace ("confirmation_info", &nano::json_handler::confirmation_info);
