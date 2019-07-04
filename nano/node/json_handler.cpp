@@ -1662,7 +1662,7 @@ void nano::json_handler::confirmation_stuck ()
 		std::lock_guard<std::mutex> lock (node.active.mutex);
 		for (auto i (node.active.roots.begin ()), n (node.active.roots.end ()); i != n; ++i)
 		{
-			if (i->election->confirmation_request_count > 0 && !i->election->confirmed && !i->election->stopped)
+			if (i->election->confirmation_request_count > 1 && !i->election->confirmed && !i->election->stopped)
 			{
 				for (auto ii (representatives.begin ()), nn (representatives.end ()); ii != nn; ++ii)
 				{
