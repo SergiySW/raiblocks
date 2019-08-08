@@ -85,6 +85,43 @@ bool nano::block_sideband::deserialize (nano::stream & stream_a)
 	return result;
 }
 
+bool nano::block_with_sideband::deserialize_type (nano::stream & stream_a, nano::block_type type_a)
+{
+	block = nano::deserialize_block (stream_a, type_a);
+	bool error (block == nullptr);
+	if (!error)
+	{
+		sideband.type = type_a;
+		error = sideband.deserialize (stream_a);
+	}
+	return error;
+}
+
+bool nano::state_with_sideband::deserialize (nano::stream & stream_a)
+{
+	return deserialize_type (stream_a, nano::block_type::state);
+}
+
+bool nano::send_with_sideband::deserialize (nano::stream & stream_a)
+{
+	return deserialize_type (stream_a, nano::block_type::send);
+}
+
+bool nano::receive_with_sideband::deserialize (nano::stream & stream_a)
+{
+	return deserialize_type (stream_a, nano::block_type::receive);
+}
+
+bool nano::open_with_sideband::deserialize (nano::stream & stream_a)
+{
+	return deserialize_type (stream_a, nano::block_type::open);
+}
+
+bool nano::change_with_sideband::deserialize (nano::stream & stream_a)
+{
+	return deserialize_type (stream_a, nano::block_type::change);
+}
+
 nano::summation_visitor::summation_visitor (nano::transaction const & transaction_a, nano::block_store const & store_a) :
 transaction (transaction_a),
 store (store_a)

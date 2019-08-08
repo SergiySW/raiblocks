@@ -387,6 +387,36 @@ public:
 		return nano::store_iterator<nano::account, uint64_t> (nullptr);
 	}
 
+	nano::store_iterator<nano::block_hash, nano::state_with_sideband> state_v0_end () override
+	{
+		return nano::store_iterator<nano::block_hash, nano::state_with_sideband> (nullptr);
+	}
+
+	nano::store_iterator<nano::block_hash, nano::state_with_sideband> state_v1_end () override
+	{
+		return nano::store_iterator<nano::block_hash, nano::state_with_sideband> (nullptr);
+	}
+
+	nano::store_iterator<nano::block_hash, nano::send_with_sideband> send_end () override
+	{
+		return nano::store_iterator<nano::block_hash, nano::send_with_sideband> (nullptr);
+	}
+
+	nano::store_iterator<nano::block_hash, nano::receive_with_sideband> receive_end () override
+	{
+		return nano::store_iterator<nano::block_hash, nano::receive_with_sideband> (nullptr);
+	}
+
+	nano::store_iterator<nano::block_hash, nano::open_with_sideband> open_end () override
+	{
+		return nano::store_iterator<nano::block_hash, nano::open_with_sideband> (nullptr);
+	}
+
+	nano::store_iterator<nano::block_hash, nano::change_with_sideband> change_end () override
+	{
+		return nano::store_iterator<nano::block_hash, nano::change_with_sideband> (nullptr);
+	}
+
 	std::mutex & get_cache_mutex () override
 	{
 		return cache_mutex;
@@ -943,6 +973,37 @@ public:
 	{
 		return make_iterator<nano::account, uint64_t> (transaction_a, tables::confirmation_height);
 	}
+
+	nano::store_iterator<nano::block_hash, nano::state_with_sideband> state_v0_begin (nano::transaction const & transaction_a) override
+	{
+		return make_iterator<nano::block_hash, nano::state_with_sideband> (transaction_a, tables::state_blocks_v0);
+	}
+
+	nano::store_iterator<nano::block_hash, nano::state_with_sideband> state_v1_begin (nano::transaction const & transaction_a) override
+	{
+		return make_iterator<nano::block_hash, nano::state_with_sideband> (transaction_a, tables::state_blocks_v1);
+	}
+
+	nano::store_iterator<nano::block_hash, nano::send_with_sideband> send_begin (nano::transaction const & transaction_a) override
+	{
+		return make_iterator<nano::block_hash, nano::send_with_sideband> (transaction_a, tables::send_blocks);
+	}
+
+	nano::store_iterator<nano::block_hash, nano::receive_with_sideband> receive_begin (nano::transaction const & transaction_a) override
+	{
+		return make_iterator<nano::block_hash, nano::receive_with_sideband> (transaction_a, tables::receive_blocks);
+	}
+
+	nano::store_iterator<nano::block_hash, nano::open_with_sideband> open_begin (nano::transaction const & transaction_a) override
+	{
+		return make_iterator<nano::block_hash, nano::open_with_sideband> (transaction_a, tables::open_blocks);
+	}
+
+	nano::store_iterator<nano::block_hash, nano::change_with_sideband> change_begin (nano::transaction const & transaction_a) override
+	{
+		return make_iterator<nano::block_hash, nano::change_with_sideband> (transaction_a, tables::change_blocks);
+	}
+
 
 	size_t unchecked_count (nano::transaction const & transaction_a) override
 	{

@@ -25,6 +25,14 @@ extern unsigned char nano_bootstrap_weights_live[];
 extern size_t nano_bootstrap_weights_live_size;
 extern unsigned char nano_bootstrap_weights_beta[];
 extern size_t nano_bootstrap_weights_beta_size;
+extern unsigned char nano_bootstrap_priority_high_live[];
+extern size_t nano_bootstrap_priority_high_live_size;
+extern unsigned char nano_bootstrap_priority_medium_live[];
+extern size_t nano_bootstrap_priority_medium_live_size;
+extern unsigned char nano_bootstrap_priority_high_beta[];
+extern size_t nano_bootstrap_priority_high_beta_size;
+extern unsigned char nano_bootstrap_priority_medium_beta[];
+extern size_t nano_bootstrap_priority_medium_beta_size;
 }
 
 void nano::node::keepalive (std::string const & address_a, uint16_t port_a)
@@ -433,6 +441,54 @@ startup_time (std::chrono::steady_clock::now ())
 						}
 						logger.always_log ("Using bootstrap rep weight: ", account.to_account (), " -> ", weight.format_balance (Mxrb_ratio, 0, true), " XRB");
 						ledger.bootstrap_weights[account] = weight.number ();
+					}
+				}
+			}
+		}
+
+		if (!flags.inactive_node)
+		{
+			const uint8_t * priority_buffer_high = network_params.network.is_live_network () ? nano_bootstrap_priority_high_live : nano_bootstrap_priority_high_beta;
+			size_t priority_buffer_high_size = network_params.network.is_live_network () ? nano_bootstrap_priority_high_live_size : nano_bootstrap_priority_high_beta_size;
+			const uint8_t * priority_buffer_medium = network_params.network.is_live_network () ? nano_bootstrap_priority_medium_live : nano_bootstrap_priority_medium_beta;
+			size_t priority_buffer_medium_size = network_params.network.is_live_network () ? nano_bootstrap_priority_medium_live_size : nano_bootstrap_priority_medium_beta_size;
+			if (network_params.network.is_live_network () || network_params.network.is_beta_network ())
+			{
+				nano::bufferstream high_stream ((const uint8_t *)priority_buffer_high, priority_buffer_high_size);
+				uint64_t max_blocks;
+				if (!nano::try_read (high_stream, max_blocks))
+				{
+					auto transaction (store.tx_begin_read ());
+					if (ledger.store.block_count (transaction).sum () < max_blocks)
+					{
+						while (true)
+						{
+							nano::account account;
+							if (nano::try_read (high_stream, account.bytes))
+							{
+								break;
+							}
+							bootstrap_initiator.priority_accounts_high.insert (account);
+						}
+						logger.always_log (boost::str (boost::format ("Using %1% high priority accounts for bootstrap") % bootstrap_initiator.priority_accounts_high.size ()));
+					}
+				}
+				nano::bufferstream medium_stream ((const uint8_t *)priority_buffer_medium, priority_buffer_medium_size);
+				if (!nano::try_read (medium_stream, max_blocks))
+				{
+					auto transaction (store.tx_begin_read ());
+					if (ledger.store.block_count (transaction).sum () < max_blocks)
+					{
+						while (true)
+						{
+							nano::account account;
+							if (nano::try_read (medium_stream, account.bytes))
+							{
+								break;
+							}
+							bootstrap_initiator.priority_accounts_medium.insert (account);
+						}
+						logger.always_log (boost::str (boost::format ("Using %1% medium priority accounts for bootstrap") % bootstrap_initiator.priority_accounts_medium.size ()));
 					}
 				}
 			}
@@ -1576,7 +1632,9 @@ peering_port (peering_port_a)
 	nano::set_secure_perm_directory (path, error_chmod);
 	logging.max_size = std::numeric_limits<std::uintmax_t>::max ();
 	logging.init (path);
-	node = std::make_shared<nano::node> (init, *io_context, peering_port, path, alarm, logging, work);
+	nano::node_flags flags;
+	flags.inactive_node = true;
+	node = std::make_shared<nano::node> (init, *io_context, peering_port, path, alarm, logging, work, flags);
 	node->active.stop ();
 }
 

@@ -1597,6 +1597,8 @@ void nano::json_handler::bootstrap_status ()
 	{
 		response_l.put ("clients", std::to_string (attempt->clients.size ()));
 		response_l.put ("pulls", std::to_string (attempt->pulls.size ()));
+		response_l.put ("pulls_high", std::to_string (attempt->pulls_high.size ()));
+		response_l.put ("pulls_medium", std::to_string (attempt->pulls_medium.size ()));
 		response_l.put ("pulling", std::to_string (attempt->pulling));
 		response_l.put ("connections", std::to_string (attempt->connections));
 		response_l.put ("idle", std::to_string (attempt->idle.size ()));

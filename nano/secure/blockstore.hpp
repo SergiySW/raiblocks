@@ -14,6 +14,56 @@
 
 namespace nano
 {
+class block_sideband final
+{
+public:
+	block_sideband () = default;
+	block_sideband (nano::block_type, nano::account const &, nano::block_hash const &, nano::amount const &, uint64_t, uint64_t);
+	void serialize (nano::stream &) const;
+	bool deserialize (nano::stream &);
+	static size_t size (nano::block_type);
+	nano::block_type type{ nano::block_type::invalid };
+	nano::block_hash successor{ 0 };
+	nano::account account{ 0 };
+	nano::amount balance{ 0 };
+	uint64_t height{ 0 };
+	uint64_t timestamp{ 0 };
+};
+
+class block_with_sideband
+{
+public:
+	block_with_sideband () = default;
+	virtual bool deserialize (nano::stream &) = 0;
+	bool deserialize_type (nano::stream &, nano::block_type);
+	std::shared_ptr<nano::block> block;
+	nano::block_sideband sideband;
+};
+class state_with_sideband final : public nano::block_with_sideband
+{
+public:
+	bool deserialize (nano::stream &) override;
+};
+class send_with_sideband final : public nano::block_with_sideband
+{
+public:
+	bool deserialize (nano::stream &) override;
+};
+class receive_with_sideband final : public nano::block_with_sideband
+{
+public:
+	bool deserialize (nano::stream &) override;
+};
+class open_with_sideband final : public nano::block_with_sideband
+{
+public:
+	bool deserialize (nano::stream &) override;
+};
+class change_with_sideband final : public nano::block_with_sideband
+{
+public:
+	bool deserialize (nano::stream &) override;
+};
 /**
  * Encapsulates database specific container and provides uint256_union conversion of the data.
  */
@@ -255,6 +305,56 @@ public:
 		return convert_to_block<nano::state_block> ();
 	}
 
+	explicit operator nano::state_with_sideband () const
+	{
+		nano::bufferstream stream (reinterpret_cast<uint8_t const *> (data ()), size ());
+		nano::state_with_sideband result;
+		auto error (result.deserialize (stream));
+		(void)error;
+		assert (!error);
+		return result;
+	}
+
+	explicit operator nano::send_with_sideband () const
+	{
+		nano::bufferstream stream (reinterpret_cast<uint8_t const *> (data ()), size ());
+		nano::send_with_sideband result;
+		auto error (result.deserialize (stream));
+		(void)error;
+		assert (!error);
+		return result;
+	}
+
+	explicit operator nano::receive_with_sideband () const
+	{
+		nano::bufferstream stream (reinterpret_cast<uint8_t const *> (data ()), size ());
+		nano::receive_with_sideband result;
+		auto error (result.deserialize (stream));
+		(void)error;
+		assert (!error);
+		return result;
+	}
+
+	explicit operator nano::open_with_sideband () const
+	{
+		nano::bufferstream stream (reinterpret_cast<uint8_t const *> (data ()), size ());
+		nano::open_with_sideband result;
+		auto error (result.deserialize (stream));
+		assert (!error);
+		(void)error;
+		return result;
+	}
+
+	explicit operator nano::change_with_sideband () const
+	{
+		nano::bufferstream stream (reinterpret_cast<uint8_t const *> (data ()), size ());
+		nano::change_with_sideband result;
+		auto error (result.deserialize (stream));
+		(void)error;
+		assert (!error);
+		return result;
+	}
+
 	explicit operator std::shared_ptr<nano::vote> () const
 	{
 		nano::bufferstream stream (reinterpret_cast<uint8_t const *> (data ()), size ());
@@ -297,21 +397,6 @@ public:
 	nano::epoch epoch{ nano::epoch::unspecified };
 };
 
-class block_sideband final
-{
-public:
-	block_sideband () = default;
-	block_sideband (nano::block_type, nano::account const &, nano::block_hash const &, nano::amount const &, uint64_t, uint64_t);
-	void serialize (nano::stream &) const;
-	bool deserialize (nano::stream &);
-	static size_t size (nano::block_type);
-	nano::block_type type{ nano::block_type::invalid };
-	nano::block_hash successor{ 0 };
-	nano::account account{ 0 };
-	nano::amount balance{ 0 };
-	uint64_t height{ 0 };
-	uint64_t timestamp{ 0 };
-};
 class transaction;
 class block_store;
 
@@ -580,6 +665,18 @@ public:
 	virtual bool root_exists (nano::transaction const &, nano::uint256_union const &) = 0;
 	virtual bool source_exists (nano::transaction const &, nano::block_hash const &) = 0;
 	virtual nano::account block_account (nano::transaction const &, nano::block_hash const &) const = 0;
+	virtual nano::store_iterator<nano::block_hash, nano::state_with_sideband> state_v0_begin (nano::transaction const &) = 0;
+	virtual nano::store_iterator<nano::block_hash, nano::state_with_sideband> state_v0_end () = 0;
+	virtual nano::store_iterator<nano::block_hash, nano::state_with_sideband> state_v1_begin (nano::transaction const &) = 0;
+	virtual nano::store_iterator<nano::block_hash, nano::state_with_sideband> state_v1_end () = 0;
+	virtual nano::store_iterator<nano::block_hash, nano::send_with_sideband> send_begin (nano::transaction const &) = 0;
+	virtual nano::store_iterator<nano::block_hash, nano::send_with_sideband> send_end () = 0;
+	virtual nano::store_iterator<nano::block_hash, nano::receive_with_sideband> receive_begin (nano::transaction const &) = 0;
+	virtual nano::store_iterator<nano::block_hash, nano::receive_with_sideband> receive_end () = 0;
+	virtual nano::store_iterator<nano::block_hash, nano::open_with_sideband> open_begin (nano::transaction const &) = 0;
+	virtual nano::store_iterator<nano::block_hash, nano::open_with_sideband> open_end () = 0;
+	virtual nano::store_iterator<nano::block_hash, nano::change_with_sideband> change_begin (nano::transaction const &) = 0;
+	virtual nano::store_iterator<nano::block_hash, nano::change_with_sideband> change_end () = 0;
 
 	virtual void frontier_put (nano::transaction const &, nano::block_hash const &, nano::account const &) = 0;
 	virtual nano::account frontier_get (nano::transaction const &, nano::block_hash const &) const = 0;

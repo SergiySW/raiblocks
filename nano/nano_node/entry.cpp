@@ -129,6 +129,7 @@ int main (int argc, char * const * argv)
 		("debug_validate_blocks", "Check all blocks for correct hash, signature, work value")
 		("debug_peers", "Display peer IPv6:port connections")
 		("debug_cemented_block_count", "Displays the number of cemented (confirmed) blocks")
+		("debug_bootstrap_priority", "Generate bootstrap priority file (high RAM usage)")
 		("platform", boost::program_options::value<std::string> (), "Defines the <platform> for OpenCL commands")
 		("device", boost::program_options::value<std::string> (), "Defines <device> for OpenCL command")
 		("threads", boost::program_options::value<std::string> (), "Defines <threads> count for OpenCL command")
@@ -1043,6 +1044,252 @@ int main (int argc, char * const * argv)
 			nano::inactive_node node (data_path);
 			auto transaction (node.node->store.tx_begin_read ());
 			std::cout << "Total cemented block count: " << node.node->store.cemented_count (transaction) << std::endl;
+		}
+		else if (vm.count ("debug_bootstrap_priority"))
+		{
+			nano::inactive_node node (data_path);
+			class block_data final
+			{
+			public:
+				nano::block_hash previous;
+				nano::block_hash source;
+				nano::account account;
+				uint64_t height;
+			};
+			std::unordered_map<nano::block_hash, block_data> blocks;
+			nano::genesis genesis;
+			auto genesis_hash (genesis.hash ());
+			auto time_point0 (std::chrono::high_resolution_clock::now ());
+			auto transaction (node.node->store.tx_begin_read ());
+
+			nano::block_counts block_count (node.node->store.block_count (transaction));
+			std::cout << "Load blocks into memory...\n";
+			// Load state blocks into memory
+			for (auto i (node.node->store.state_v0_begin (transaction)), n (node.node->store.state_v0_end ()); i != n; ++i)
+			{
+				nano::block_hash hash (i->first);
+				nano::state_with_sideband block_with_sideband (i->second);
+				release_assert (block_with_sideband.block != nullptr && block_with_sideband.block->hash () == hash && !block_with_sideband.block->account ().is_zero ());
+				nano::block_hash source (0);
+				std::shared_ptr<nano::state_block> state (std::static_pointer_cast<nano::state_block> (block_with_sideband.block));
+				if (state != nullptr)
+				{
+					if (!state->hashables.link.is_zero () && !node.node->ledger.is_epoch_link (state->hashables.link) && !node.node->ledger.is_send (transaction, *state))
+					{
+						source = state->hashables.link;
+					}
+				}
+				blocks.emplace (hash, block_data{ block_with_sideband.block->previous (), source, block_with_sideband.block->account (), block_with_sideband.sideband.height });
+			}
+			release_assert (blocks.size () == block_count.state_v0);
+			for (auto i (node.node->store.state_v1_begin (transaction)), n (node.node->store.state_v1_end ()); i != n; ++i)
+			{
+				nano::block_hash hash (i->first);
+				nano::state_with_sideband block_with_sideband (i->second);
+				release_assert (block_with_sideband.block != nullptr && block_with_sideband.block->hash () == hash && !block_with_sideband.block->account ().is_zero ());
+				nano::block_hash source (0);
+				std::shared_ptr<nano::state_block> state (std::static_pointer_cast<nano::state_block> (block_with_sideband.block));
+				if (state != nullptr)
+				{
+					if (!state->hashables.link.is_zero () && !node.node->ledger.is_epoch_link (state->hashables.link) && !node.node->ledger.is_send (transaction, *state))
+					{
+						source = state->hashables.link;
+					}
+				}
+				blocks.emplace (hash, block_data{ block_with_sideband.block->previous (), source, block_with_sideband.block->account (), block_with_sideband.sideband.height });
+			}
+			release_assert (blocks.size () == block_count.state_v0 + block_count.state_v1);
+			// Load send blocks into memory
+			for (auto i (node.node->store.send_begin (transaction)), n (node.node->store.send_end ()); i != n; ++i)
+			{
+				nano::block_hash hash (i->first);
+				nano::send_with_sideband block_with_sideband (i->second);
+				release_assert (block_with_sideband.block != nullptr && block_with_sideband.block->hash () == hash && !block_with_sideband.sideband.account.is_zero ());
+				blocks.emplace (hash, block_data{ block_with_sideband.block->previous (), 0, block_with_sideband.sideband.account, block_with_sideband.sideband.height });
+			}
+			release_assert (blocks.size () == block_count.state_v0 + block_count.state_v1 + block_count.send);
+			// Load receive blocks into memory
+			for (auto i (node.node->store.receive_begin (transaction)), n (node.node->store.receive_end ()); i != n; ++i)
+			{
+				nano::block_hash hash (i->first);
+				nano::receive_with_sideband block_with_sideband (i->second);
+				release_assert (block_with_sideband.block != nullptr && block_with_sideband.block->hash () == hash && !block_with_sideband.sideband.account.is_zero ());
+				blocks.emplace (hash, block_data{ block_with_sideband.block->previous (), block_with_sideband.block->source (), block_with_sideband.sideband.account, block_with_sideband.sideband.height });
+			}
+			release_assert (blocks.size () == block_count.state_v0 + block_count.state_v1 + block_count.send + block_count.receive);
+			// Load open blocks into memory
+			for (auto i (node.node->store.open_begin (transaction)), n (node.node->store.open_end ()); i != n; ++i)
+			{
+				nano::block_hash hash (i->first);
+				nano::open_with_sideband block_with_sideband (i->second);
+				release_assert (block_with_sideband.block != nullptr && block_with_sideband.block->hash () == hash && !block_with_sideband.block->account ().is_zero ());
+				nano::block_hash source (hash == genesis_hash ? 0 : block_with_sideband.block->source ());
+				blocks.emplace (hash, block_data{ 0, source, block_with_sideband.block->account (), block_with_sideband.sideband.height });
+			}
+			release_assert (blocks.size () == block_count.state_v0 + block_count.state_v1 + block_count.send + block_count.receive + block_count.open);
+			// Load change blocks into memory
+			for (auto i (node.node->store.change_begin (transaction)), n (node.node->store.change_end ()); i != n; ++i)
+			{
+				nano::block_hash hash (i->first);
+				nano::change_with_sideband block_with_sideband (i->second);
+				release_assert (block_with_sideband.block != nullptr && block_with_sideband.block->hash () == hash && !block_with_sideband.sideband.account.is_zero ());
+				blocks.emplace (hash, block_data{ block_with_sideband.block->previous (), 0, block_with_sideband.sideband.account, block_with_sideband.sideband.height });
+			}
+			release_assert (blocks.size () == block_count.sum ());
+			auto time_point1 (std::chrono::high_resolution_clock::now ());
+			auto time1 (std::chrono::duration_cast<std::chrono::seconds> (time_point1 - time_point0).count ());
+			std::cout << boost::str (boost::format ("%1% blocks loaded in %2% seconds\n") % blocks.size () % time1);
+
+			class account_counters final
+			{
+			public:
+				nano::account account;
+				uint64_t count;
+			};
+			boost::multi_index_container<
+			account_counters,
+			boost::multi_index::indexed_by<
+			boost::multi_index::ordered_non_unique<boost::multi_index::member<account_counters, uint64_t, &account_counters::count>, std::greater<uint64_t>>,
+			boost::multi_index::hashed_unique<boost::multi_index::member<account_counters, nano::account, &account_counters::account>>>>
+			source_accounts;
+			size_t count (0);
+			size_t const max_count (500);
+			size_t accounts_sum (0);
+			uint64_t blocks_sum (0);
+			// Calculate required accounts to finish each account bootstrap chains
+			std::cout << boost::str (boost::format ("Performing bootstrap priority generation for %1% random accounts...\n") % max_count);
+			while (count < max_count)
+			{
+				size_t finish_height (0);
+				uint64_t block_counter (0);
+				nano::account random_start;
+				nano::random_pool::generate_block (random_start.bytes.data (), random_start.bytes.size ());
+				auto iterator (node.node->store.latest_begin (transaction, random_start));
+				if (iterator != node.node->store.latest_end ())
+				{
+					++count;
+					nano::account_info const & info (iterator->second);
+					nano::account const & account (iterator->first);
+
+					std::unordered_map<nano::account, uint64_t> accounts;
+					accounts.emplace (account, info.block_count);
+					std::deque<nano::block_hash> sources;
+					auto hash (info.head);
+					while (!hash.is_zero ())
+					{
+						// Retrieve block data
+						auto data (blocks.find (hash));
+						release_assert (data != blocks.end ());
+						// Was block already checked?
+						if (finish_height < data->second.height)
+						{
+							++block_counter;
+							// Add source blocks
+							if (!data->second.source.is_zero ())
+							{
+								sources.push_back (data->second.source);
+							}
+							// Go to previous block
+							hash = data->second.previous;
+						}
+						else
+						{
+							hash = 0;
+						}
+						// Check other accounts
+						while (hash.is_zero () && !sources.empty ())
+						{
+							hash = sources.front ();
+							sources.pop_front ();
+							auto source_data (blocks.find (hash));
+							release_assert (source_data != blocks.end ());
+							auto existing (accounts.find (source_data->second.account));
+							if (existing != accounts.end ())
+							{
+								if (existing->second < source_data->second.height)
+								{
+									finish_height = existing->second;
+									existing->second = source_data->second.height;
+								}
+								else
+								{
+									hash = 0;
+								}
+							}
+							else
+							{
+								finish_height = 0;
+								accounts.emplace (source_data->second.account, source_data->second.height);
+							}
+						}
+					}
+					release_assert (block_counter <= block_count.sum ());
+					std::cout << "| ";
+					accounts_sum += accounts.size ();
+					blocks_sum += block_counter;
+					// Add information to final table
+					for (auto ii (accounts.begin ()), nn (accounts.end ()); ii !=nn; ++ii)
+					{
+						release_assert (!ii->first.is_zero ());
+						if (ii->first != account)
+						{
+							auto existing (source_accounts.get<1> ().find (ii->first));
+							if (existing != source_accounts.get<1> ().end ())
+							{
+								source_accounts.get<1> ().modify (existing, [](account_counters & account_counters_a) {
+									++account_counters_a.count;
+								});
+							}
+							else
+							{
+								source_accounts.insert (account_counters{ ii->first, 1 });
+							}
+						}
+					}
+				}
+			}
+			blocks.clear ();
+			std::cout << boost::str (boost::format ("\n%1% other accounts and %2% blocks required to finish average account\n") % (accounts_sum / max_count) % (blocks_sum / max_count));
+
+			std::vector<nano::account> high_level;
+			std::vector<nano::account> medium_level;
+			uint64_t high_level_threshold (count * 90 / 100);
+			uint64_t medium_level_threshold (count * 20 / 100);
+			uint64_t block_count_high (0);
+			uint64_t block_count_medium (0);
+			for (auto i (source_accounts.get<0> ().begin ()), n (source_accounts.get<0> ().end ()); i !=n; ++i)
+			{
+				nano::account_info info;
+				if (i->count >= high_level_threshold)
+				{
+					node.node->store.account_get (transaction, i->account, info);
+					block_count_high += info.block_count;
+					high_level.push_back (i->account);
+				}
+				if (i->count >= medium_level_threshold)
+				{
+					node.node->store.account_get (transaction, i->account, info);
+					block_count_medium += info.block_count;
+					medium_level.push_back (i->account);
+				}
+			}
+
+			std::cout << "Write results to files...\n";
+			std::string network (node.node->network_params.network.is_live_network () ? "live": node.node->network_params.network.is_beta_network () ? "beta" : "undefined");
+			std::ofstream binary_high;
+			binary_high.open ("bootstrap_priority_high_" + network + ".bin", std::ofstream::out | std::ofstream::binary);
+			binary_high.write (reinterpret_cast<const char *> (&block_count_high), sizeof (block_count_high));
+			binary_high.write (reinterpret_cast<const char *> (&high_level[0]), high_level.size() * sizeof (nano::account));
+			binary_high.close ();
+			std::ofstream binary_medium;
+			binary_medium.open ("bootstrap_priority_medium_" + network + ".bin", std::ofstream::out | std::ofstream::binary);
+			binary_medium.write (reinterpret_cast<const char *> (&block_count_medium), sizeof (block_count_medium));
+			binary_medium.write (reinterpret_cast<const char *> (&medium_level[0]), medium_level.size() * sizeof (nano::account));
+			binary_medium.close ();
+			
+			auto time_point2 (std::chrono::high_resolution_clock::now ());
+			auto time2 (std::chrono::duration_cast<std::chrono::seconds> (time_point2 - time_point1).count ());
+			std::cout << boost::str (boost::format ("\nFinished in %1% seconds. %2% accounts are prioritized for medium level and %3% accounts for high level\n") % time2 % medium_level.size () % high_level.size ());
 		}
 		else if (vm.count ("debug_sys_logging"))
 		{

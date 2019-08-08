@@ -329,12 +329,12 @@ void nano::bulk_pull_client::request ()
 	if (connection->node->config.logging.bulk_pull_logging ())
 	{
 		std::unique_lock<std::mutex> lock (connection->attempt->mutex);
-		connection->node->logger.try_log (boost::str (boost::format ("Requesting account %1% from %2%. %3% accounts in queue") % pull.account.to_account () % connection->channel->to_string () % connection->attempt->pulls.size ()));
+		connection->node->logger.try_log (boost::str (boost::format ("Requesting account %1% from %2%. %3% accounts in queue") % pull.account.to_account () % connection->channel->to_string () % connection->attempt->pulls_size ()));
 	}
 	else if (connection->node->config.logging.network_logging () && connection->attempt->should_log ())
 	{
 		std::unique_lock<std::mutex> lock (connection->attempt->mutex);
-		connection->node->logger.always_log (boost::str (boost::format ("%1% accounts in pull queue") % connection->attempt->pulls.size ()));
+		connection->node->logger.always_log (boost::str (boost::format ("%1% accounts in pull queue") % connection->attempt->pulls_size ()));
 	}
 	auto this_l (shared_from_this ());
 	connection->channel->send (
@@ -818,7 +818,7 @@ bool nano::bootstrap_attempt::request_frontier (std::unique_lock<std::mutex> & l
 		{
 			if (!result)
 			{
-				node->logger.try_log (boost::str (boost::format ("Completed frontier request, %1% out of sync accounts according to %2%") % pulls.size () % connection_l->channel->to_string ()));
+				node->logger.try_log (boost::str (boost::format ("Completed frontier request, %1% out of sync accounts according to %2%") % pulls_size () % connection_l->channel->to_string ()));
 			}
 			else
 			{
@@ -834,8 +834,22 @@ void nano::bootstrap_attempt::request_pull (std::unique_lock<std::mutex> & lock_
 	auto connection_l (connection (lock_a));
 	if (connection_l)
 	{
-		auto pull (pulls.front ());
-		pulls.pop_front ();
+		pull_info pull;
+		if (!pulls_high.empty ())
+		{
+			pull = pulls_high.front ();
+			pulls_high.pop_front ();
+		}
+		else if (!pulls_medium.empty ())
+		{
+			pull = pulls_medium.front ();
+			pulls_medium.pop_front ();
+		}
+		else
+		{
+			pull = pulls.front ();
+			pulls.pop_front ();
+		}
 		if (mode != nano::bootstrap_mode::legacy)
 		{
 			// Check if pull is obsolete (head was processed)
@@ -887,7 +901,7 @@ bool nano::bootstrap_attempt::still_pulling ()
 {
 	assert (!mutex.try_lock ());
 	auto running (!stopped);
-	auto more_pulls (!pulls.empty ());
+	auto more_pulls (!pulls.empty () || !pulls_high.empty () || !pulls_medium.empty ());
 	auto still_pulling (pulling > 0);
 	return running && (more_pulls || still_pulling);
 }
@@ -912,11 +926,29 @@ void nano::bootstrap_attempt::run ()
 			std::swap (pulls[i], pulls[k]);
 		}
 	}
+	release_assert (std::numeric_limits<CryptoPP::word32>::max () > pulls_high.size ());
+	if (!pulls_high.empty ())
+	{
+		for (auto i = static_cast<CryptoPP::word32> (pulls_high.size () - 1); i > 0; --i)
+		{
+			auto k = nano::random_pool::generate_word32 (0, i);
+			std::swap (pulls_high[i], pulls_high[k]);
+		}
+	}
+	release_assert (std::numeric_limits<CryptoPP::word32>::max () > pulls_medium.size ());
+	if (!pulls_medium.empty ())
+	{
+		for (auto i = static_cast<CryptoPP::word32> (pulls_medium.size () - 1); i > 0; --i)
+		{
+			auto k = nano::random_pool::generate_word32 (0, i);
+			std::swap (pulls_medium[i], pulls_medium[k]);
+		}
+	}
 	while (still_pulling ())
 	{
 		while (still_pulling ())
 		{
-			if (!pulls.empty ())
+			if (!pulls.empty () || !pulls_high.empty () || !pulls_medium.empty ())
 			{
 				if (!node->block_processor.full ())
 				{
@@ -1028,7 +1060,7 @@ void nano::bootstrap_attempt::populate_connections ()
 	std::unordered_set<nano::tcp_endpoint> endpoints;
 	{
 		std::unique_lock<std::mutex> lock (mutex);
-		num_pulls = pulls.size ();
+		num_pulls = pulls_size ();
 		std::deque<std::weak_ptr<nano::bootstrap_client>> new_clients;
 		for (auto & c : clients)
 		{
@@ -1091,7 +1123,7 @@ void nano::bootstrap_attempt::populate_connections ()
 	if (node->config.logging.bulk_pull_logging ())
 	{
 		std::unique_lock<std::mutex> lock (mutex);
-		node->logger.try_log (boost::str (boost::format ("Bulk pull connections: %1%, rate: %2% blocks/sec, remaining account pulls: %3%, total blocks: %4%") % connections.load () % (int)rate_sum % pulls.size () % (int)total_blocks.load ()));
+		node->logger.try_log (boost::str (boost::format ("Bulk pull connections: %1%, rate: %2% blocks/sec, remaining account pulls: %3%, total blocks: %4%") % connections.load () % (int)rate_sum % num_pulls % (int)total_blocks.load ()));
 	}
 
 	if (connections < target)
@@ -1223,8 +1255,24 @@ void nano::bootstrap_attempt::add_pull (nano::pull_info const & pull_a)
 	nano::pull_info pull (pull_a);
 	node->bootstrap_initiator.cache.update_pull (pull);
 	{
-		std::lock_guard<std::mutex> lock (mutex);
-		pulls.push_back (pull);
+		// Pulls prioritization levels
+		if (mode == nano::bootstrap_mode::legacy && node->bootstrap_initiator.priority_accounts_high.find (pull.account) != node->bootstrap_initiator.priority_accounts_high.end ())
+		{
+			pull.priority = true;
+			std::lock_guard<std::mutex> lock (mutex);
+			pulls_high.push_back (pull);
+		}
+		else if (mode == nano::bootstrap_mode::legacy && node->bootstrap_initiator.priority_accounts_medium.find (pull.account) != node->bootstrap_initiator.priority_accounts_medium.end ())
+		{
+			pull.priority = true;
+			std::lock_guard<std::mutex> lock (mutex);
+			pulls_medium.push_back (pull);
+		}
+		else
+		{
+			std::lock_guard<std::mutex> lock (mutex);
+			pulls.push_back (pull);
+		}
 	}
 	condition.notify_all ();
 }
@@ -1232,10 +1280,24 @@ void nano::bootstrap_attempt::add_pull (nano::pull_info const & pull_a)
 void nano::bootstrap_attempt::requeue_pull (nano::pull_info const & pull_a)
 {
 	auto pull (pull_a);
-	if (++pull.attempts < (bootstrap_frontier_retry_limit + (pull.processed / 10000)))
+	if (++pull.attempts < (bootstrap_frontier_retry_limit + (pull.processed / 10000) + (pull.priority * bootstrap_frontier_retry_limit / 2)))
 	{
 		std::lock_guard<std::mutex> lock (mutex);
-		pulls.push_front (pull);
+		if (pull.priority)
+		{
+			if (node->bootstrap_initiator.priority_accounts_high.find (pull.account) != node->bootstrap_initiator.priority_accounts_high.end ())
+			{
+				pulls_high.push_front (pull);
+			}
+			else
+			{
+				pulls_medium.push_front (pull);
+			}
+		}
+		else
+		{
+			pulls.push_front (pull);
+		}
 		condition.notify_all ();
 	}
 	else if (mode == nano::bootstrap_mode::lazy)
@@ -1354,7 +1416,7 @@ void nano::bootstrap_attempt::lazy_run ()
 		unsigned iterations (0);
 		while (still_pulling () && lazy_stopped < lazy_max_stopped && std::chrono::steady_clock::now () - start_time < max_time)
 		{
-			if (!pulls.empty ())
+			if (!pulls.empty () || !pulls_high.empty () || !pulls_medium.empty ())
 			{
 				if (!node->block_processor.full ())
 				{
@@ -1647,6 +1709,11 @@ void nano::bootstrap_attempt::wallet_run ()
 	stopped = true;
 	condition.notify_all ();
 	idle.clear ();
+}
+
+size_t nano::bootstrap_attempt::pulls_size ()
+{
+	return pulls.size () + pulls_high.size () + pulls_medium.size ();
 }
 
 nano::bootstrap_initiator::bootstrap_initiator (nano::node & node_a) :
