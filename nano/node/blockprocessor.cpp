@@ -54,7 +54,7 @@ void nano::block_processor::add (std::shared_ptr<nano::block> block_a, uint64_t 
 	add (info);
 }
 
-void nano::block_processor::add (nano::unchecked_info const & info_a)
+void nano::block_processor::add (nano::unchecked_info const & info_a, bool to_front)
 {
 	if (!nano::work_validate (info_a.block->root (), info_a.block->block_work ()))
 	{
@@ -65,11 +65,25 @@ void nano::block_processor::add (nano::unchecked_info const & info_a)
 			{
 				if (info_a.verified == nano::signature_verification::unknown && (info_a.block->type () == nano::block_type::state || info_a.block->type () == nano::block_type::open || !info_a.account.is_zero ()))
 				{
-					state_blocks.push_back (info_a);
+					if (!to_front)
+					{
+						state_blocks.push_back (info_a);
+					}
+					else
+					{
+						state_blocks.push_front (info_a);
+					}
 				}
 				else
 				{
-					blocks.push_back (info_a);
+					if (!to_front)
+					{
+						blocks.push_back (info_a);
+					}
+					else
+					{
+						blocks.push_front (info_a);
+					}
 				}
 				blocks_hashes.insert (hash);
 			}
@@ -538,7 +552,7 @@ void nano::block_processor::queue_unchecked (nano::transaction const & transacti
 		{
 			node.store.unchecked_del (transaction_a, nano::unchecked_key (hash_a, info.block->hash ()));
 		}
-		add (info);
+		add (info, true); // add unchecked blocks to queue front for faster processing
 	}
 	node.gap_cache.erase (hash_a);
 }

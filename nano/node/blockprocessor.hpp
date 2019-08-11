@@ -38,7 +38,7 @@ public:
 	void stop ();
 	void flush ();
 	bool full ();
-	void add (nano::unchecked_info const &);
+	void add (nano::unchecked_info const &, bool = false);
 	void add (std::shared_ptr<nano::block>, uint64_t = 0);
 	void force (std::shared_ptr<nano::block>);
 	void wait_write ();
