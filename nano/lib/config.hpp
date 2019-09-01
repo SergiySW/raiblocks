@@ -15,8 +15,7 @@
 /**
 * Returns build version information
 */
-static const char * NANO_MAJOR_MINOR_VERSION = xstr (NANO_VERSION_MAJOR) "." xstr (NANO_VERSION_MINOR);
-static const char * NANO_MAJOR_MINOR_RC_VERSION = xstr (NANO_VERSION_MAJOR) "." xstr (NANO_VERSION_MINOR) "RC" xstr (NANO_VERSION_PATCH);
+static const char * NANO_VERSION_STRING = xstr (TAG_VERSION_STRING);
 
 static const char * BUILD_INFO = xstr (GIT_COMMIT_HASH BOOST_COMPILER) " \"BOOST " xstr (BOOST_VERSION) "\" BUILT " xstr (__DATE__);
 
@@ -161,6 +160,21 @@ inline boost::filesystem::path get_config_path (boost::filesystem::path const & 
 inline boost::filesystem::path get_rpc_config_path (boost::filesystem::path const & data_path)
 {
 	return data_path / "rpc_config.json";
+}
+
+inline boost::filesystem::path get_node_toml_config_path (boost::filesystem::path const & data_path)
+{
+	return data_path / "config-node.toml";
+}
+
+inline boost::filesystem::path get_rpc_toml_config_path (boost::filesystem::path const & data_path)
+{
+	return data_path / "config-rpc.toml";
+}
+
+inline boost::filesystem::path get_qtwallet_toml_config_path (boost::filesystem::path const & data_path)
+{
+	return data_path / "config-qtwallet.toml";
 }
 
 /** Called by gtest_main to enforce test network */

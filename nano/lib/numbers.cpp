@@ -10,13 +10,6 @@
 
 namespace
 {
-char const * base58_reverse ("~012345678~~~~~~~9:;<=>?@~ABCDE~FGHIJKLMNOP~~~~~~QRSTUVWXYZ[~\\]^_`abcdefghi");
-uint8_t base58_decode (char value)
-{
-	assert (value >= '0');
-	assert (value <= '~');
-	return static_cast<uint8_t> (base58_reverse[value - 0x30] - 0x30);
-}
 char const * account_lookup ("13456789abcdefghijkmnopqrstuwxyz");
 char const * account_reverse ("~0~1234567~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~89:;<=>?@AB~CDEFGHIJK~LMNO~~~~~");
 char account_encode (uint8_t value)
@@ -209,7 +202,7 @@ void nano::uint256_union::encode_hex (std::string & text) const
 {
 	assert (text.empty ());
 	std::stringstream stream;
-	stream << std::hex << std::noshowbase << std::setw (64) << std::setfill ('0');
+	stream << std::hex << std::uppercase << std::noshowbase << std::setw (64) << std::setfill ('0');
 	stream << number ();
 	text = stream.str ();
 }
@@ -326,7 +319,7 @@ void nano::uint512_union::encode_hex (std::string & text) const
 {
 	assert (text.empty ());
 	std::stringstream stream;
-	stream << std::hex << std::noshowbase << std::setw (128) << std::setfill ('0');
+	stream << std::hex << std::uppercase << std::noshowbase << std::setw (128) << std::setfill ('0');
 	stream << number ();
 	text = stream.str ();
 }
@@ -483,7 +476,7 @@ void nano::uint128_union::encode_hex (std::string & text) const
 {
 	assert (text.empty ());
 	std::stringstream stream;
-	stream << std::hex << std::noshowbase << std::setw (32) << std::setfill ('0');
+	stream << std::hex << std::uppercase << std::noshowbase << std::setw (32) << std::setfill ('0');
 	stream << number ();
 	text = stream.str ();
 }

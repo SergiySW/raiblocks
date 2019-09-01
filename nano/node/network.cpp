@@ -215,12 +215,12 @@ bool nano::network::send_votes_cache (std::shared_ptr<nano::transport::channel> 
 	return result;
 }
 
-void nano::network::flood_message (nano::message const & message_a)
+void nano::network::flood_message (nano::message const & message_a, bool const is_droppable_a)
 {
 	auto list (list_fanout ());
 	for (auto i (list.begin ()), n (list.end ()); i != n; ++i)
 	{
-		(*i)->send (message_a);
+		(*i)->send (message_a, nullptr, is_droppable_a);
 	}
 }
 
@@ -246,7 +246,7 @@ void nano::network::flood_block_batch (std::deque<std::shared_ptr<nano::block>> 
 void nano::network::send_confirm_req (std::shared_ptr<nano::transport::channel> channel_a, std::shared_ptr<nano::block> block_a)
 {
 	// Confirmation request with hash + root
-	if (channel_a->get_network_version () >= nano::tcp_realtime_protocol_version_min)
+	if (channel_a->get_network_version () >= node.network_params.protocol.tcp_realtime_protocol_version_min)
 	{
 		nano::confirm_req req (block_a->hash (), block_a->root ());
 		channel_a->send (req);
@@ -394,7 +394,7 @@ namespace
 class network_message_visitor : public nano::message_visitor
 {
 public:
-	network_message_visitor (nano::node & node_a, std::shared_ptr<nano::transport::channel> channel_a) :
+	network_message_visitor (nano::node & node_a, std::shared_ptr<nano::transport::channel> const & channel_a) :
 	node (node_a),
 	channel (channel_a)
 	{
@@ -418,6 +418,10 @@ public:
 		if (!node.block_processor.full ())
 		{
 			node.process_active (message_a.block);
+		}
+		else
+		{
+			node.stats.inc (nano::stat::type::drop, nano::stat::detail::publish, nano::stat::dir::in);
 		}
 		node.active.publish (message_a.block);
 	}
@@ -534,6 +538,10 @@ public:
 				if (!node.block_processor.full ())
 				{
 					node.process_active (block);
+				}
+				else
+				{
+					node.stats.inc (nano::stat::type::drop, nano::stat::detail::confirm_ack, nano::stat::dir::in);
 				}
 				node.active.publish (block);
 			}
@@ -681,7 +689,7 @@ nano::tcp_endpoint nano::network::bootstrap_peer ()
 	bool use_udp_peer (nano::random_pool::generate_word32 (0, 1));
 	if (use_udp_peer || tcp_channels.size () == 0)
 	{
-		result = udp_channels.bootstrap_peer ();
+		result = udp_channels.bootstrap_peer (node.network_params.protocol.protocol_version_bootstrap_min);
 	}
 	if (result == nano::tcp_endpoint (boost::asio::ip::address_v6::any (), 0))
 	{
@@ -834,10 +842,12 @@ stopped (false)
 nano::message_buffer * nano::message_buffer_manager::allocate ()
 {
 	std::unique_lock<std::mutex> lock (mutex);
-	while (!stopped && free.empty () && full.empty ())
+	if (!stopped && free.empty () && full.empty ())
 	{
 		stats.inc (nano::stat::type::udp, nano::stat::detail::blocking, nano::stat::dir::in);
-		condition.wait (lock);
+		// clang-format off
+		condition.wait (lock, [& stopped = stopped, &free = free, &full = full] { return stopped || !free.empty () || !full.empty (); });
+		// clang-format on
 	}
 	nano::message_buffer * result (nullptr);
 	if (!free.empty ())

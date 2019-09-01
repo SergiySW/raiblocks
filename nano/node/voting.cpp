@@ -8,20 +8,15 @@ node (node_a),
 thread ([this]() { run (); })
 {
 	std::unique_lock<std::mutex> lock (mutex);
-	while (!started)
-	{
-		condition.wait (lock);
-	}
+	condition.wait (lock, [& started = started] { return started; });
 }
 
 void nano::vote_generator::add (nano::block_hash const & hash_a)
 {
 	std::unique_lock<std::mutex> lock (mutex);
 	hashes.push_back (hash_a);
-	if (hashes.size () >= node.config.vote_generator_threshold)
+	if (hashes.size () >= 12)
 	{
-		// Potentially high load, notify to wait for more hashes
-		wakeup = true;
 		lock.unlock ();
 		condition.notify_all ();
 	}
@@ -31,7 +26,6 @@ void nano::vote_generator::stop ()
 {
 	std::unique_lock<std::mutex> lock (mutex);
 	stopped = true;
-	wakeup = true;
 
 	lock.unlock ();
 	condition.notify_all ();
@@ -56,7 +50,7 @@ void nano::vote_generator::send (std::unique_lock<std::mutex> & lock_a)
 		auto transaction (node.store.tx_begin_read ());
 		node.wallets.foreach_representative (transaction, [this, &hashes_l, &transaction](nano::public_key const & pub_a, nano::raw_key const & prv_a) {
 			auto vote (this->node.store.vote_generate (transaction, pub_a, prv_a, hashes_l));
-			this->node.vote_processor.vote (vote, std::make_shared<nano::transport::channel_udp> (this->node.network.udp_channels, this->node.network.endpoint ()));
+			this->node.vote_processor.vote (vote, std::make_shared<nano::transport::channel_udp> (this->node.network.udp_channels, this->node.network.endpoint (), this->node.network_params.protocol.protocol_version));
 			this->node.votes_cache.add (vote);
 		});
 	}
@@ -79,14 +73,14 @@ void nano::vote_generator::run ()
 		}
 		else
 		{
-			wakeup = false;
-			if (!condition.wait_for (lock, node.config.vote_generator_delay, [this]() { return this->wakeup; }))
+			condition.wait_for (lock, node.config.vote_generator_delay, [this]() { return this->hashes.size () >= 12; });
+			if (hashes.size () >= node.config.vote_generator_threshold && hashes.size () < 12)
 			{
-				// Did not wake up early. Likely not under high load, ok to send lower number of hashes
-				if (!hashes.empty ())
-				{
-					send (lock);
-				}
+				condition.wait_for (lock, node.config.vote_generator_delay, [this]() { return this->hashes.size () >= 12; });
+			}
+			if (!hashes.empty ())
+			{
+				send (lock);
 			}
 		}
 	}

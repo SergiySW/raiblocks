@@ -98,7 +98,7 @@ public:
 	static unsigned const version_2 = 2;
 	static unsigned const version_3 = 3;
 	static unsigned const version_4 = 4;
-	unsigned const version_current = version_4;
+	static unsigned constexpr version_current = version_4;
 	static nano::uint256_union const version_special;
 	static nano::uint256_union const wallet_key_special;
 	static nano::uint256_union const salt_special;
@@ -161,22 +161,22 @@ public:
 	std::unordered_set<nano::account> representatives;
 };
 
-class work_watcher
+class work_watcher final : public std::enable_shared_from_this<nano::work_watcher>
 {
 public:
 	work_watcher (nano::node &);
 	~work_watcher ();
 	void stop ();
-	void run ();
 	void add (std::shared_ptr<nano::block>);
+	void update (nano::qualified_root const &, std::shared_ptr<nano::state_block>);
+	void watching (nano::qualified_root const &, std::shared_ptr<nano::state_block>);
 	void remove (std::shared_ptr<nano::block>);
 	bool is_watched (nano::qualified_root const &);
+	size_t size ();
 	std::mutex mutex;
 	nano::node & node;
-	std::condition_variable condition;
+	std::unordered_map<nano::qualified_root, std::shared_ptr<nano::state_block>> watched;
 	std::atomic<bool> stopped;
-	std::unordered_map<nano::qualified_root, std::shared_ptr<nano::state_block>> blocks;
-	std::thread thread;
 };
 /**
  * The wallets set is all the wallets a node controls.
@@ -199,6 +199,7 @@ public:
 	bool exists (nano::transaction const &, nano::public_key const &);
 	void stop ();
 	void clear_send_ids (nano::transaction const &);
+	bool check_rep (nano::transaction const &, nano::account const &, nano::uint128_t const &);
 	void compute_reps ();
 	void ongoing_compute_reps ();
 	void split_if_needed (nano::transaction &, nano::block_store &);
@@ -216,11 +217,12 @@ public:
 	nano::node & node;
 	nano::mdb_env & env;
 	std::atomic<bool> stopped;
-	nano::work_watcher watcher;
+	std::shared_ptr<nano::work_watcher> watcher;
 	boost::thread thread;
 	static nano::uint128_t const generate_priority;
 	static nano::uint128_t const high_priority;
 	std::atomic<uint64_t> reps_count{ 0 };
+	std::atomic<uint64_t> half_principal_reps_count{ 0 }; // Representatives with at least 50% of principal representative requirements
 
 	/** Start read-write transaction */
 	nano::write_transaction tx_begin_write ();
@@ -235,11 +237,14 @@ class wallets_store
 {
 public:
 	virtual ~wallets_store () = default;
+	virtual bool init_error () const = 0;
 };
 class mdb_wallets_store final : public wallets_store
 {
 public:
-	mdb_wallets_store (bool &, boost::filesystem::path const &, int lmdb_max_dbs = 128);
+	mdb_wallets_store (boost::filesystem::path const &, int lmdb_max_dbs = 128);
 	nano::mdb_env environment;
+	bool init_error () const override;
+	bool error{ false };
 };
 }

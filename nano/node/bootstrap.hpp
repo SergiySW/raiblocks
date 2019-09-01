@@ -157,6 +157,7 @@ public:
 	~bulk_pull_client ();
 	void request ();
 	void receive_block ();
+	void throttled_receive_block ();
 	void received_type ();
 	void received_block (boost::system::error_code const &, size_t, nano::block_type);
 	nano::block_hash first ();
@@ -164,7 +165,7 @@ public:
 	nano::block_hash expected;
 	nano::account known_account;
 	nano::pull_info pull;
-	uint64_t total_blocks;
+	uint64_t pull_blocks;
 	uint64_t unexpected_count;
 };
 class bootstrap_client final : public std::enable_shared_from_this<bootstrap_client>
@@ -207,7 +208,7 @@ public:
 	void receive_pending ();
 	std::shared_ptr<nano::bootstrap_client> connection;
 	nano::account account;
-	uint64_t total_blocks;
+	uint64_t pull_blocks;
 };
 class cached_pulls final
 {
@@ -349,7 +350,6 @@ public:
 	void no_block_sent (boost::system::error_code const &, size_t);
 	std::shared_ptr<nano::bootstrap_server> connection;
 	std::unique_ptr<nano::bulk_pull> request;
-	std::shared_ptr<std::vector<uint8_t>> send_buffer;
 	nano::block_hash current;
 	bool include_start;
 	nano::bulk_pull::count_t max_count;
@@ -369,7 +369,6 @@ public:
 	void complete (boost::system::error_code const &, size_t);
 	std::shared_ptr<nano::bootstrap_server> connection;
 	std::unique_ptr<nano::bulk_pull_account> request;
-	std::shared_ptr<std::vector<uint8_t>> send_buffer;
 	std::unordered_set<nano::uint256_union> deduplication;
 	nano::pending_key current_key;
 	bool pending_address_only;
@@ -380,6 +379,7 @@ class bulk_push_server final : public std::enable_shared_from_this<nano::bulk_pu
 {
 public:
 	explicit bulk_push_server (std::shared_ptr<nano::bootstrap_server> const &);
+	void throttled_receive ();
 	void receive ();
 	void received_type ();
 	void received_block (boost::system::error_code const &, size_t, nano::block_type);
@@ -400,7 +400,6 @@ public:
 	nano::account current;
 	nano::block_hash frontier;
 	std::unique_ptr<nano::frontier_req> request;
-	std::shared_ptr<std::vector<uint8_t>> send_buffer;
 	size_t count;
 	std::deque<std::pair<nano::account, nano::block_hash>> accounts;
 };

@@ -96,6 +96,7 @@ public:
 	void adjust_difficulty (nano::block_hash const &);
 	void update_active_difficulty (std::unique_lock<std::mutex> &);
 	uint64_t active_difficulty ();
+	uint64_t limited_active_difficulty ();
 	std::deque<std::shared_ptr<nano::block>> list_blocks (bool = false);
 	void erase (nano::block const &);
 	//drop 2 from roots based on adjusted_difficulty
@@ -173,6 +174,9 @@ private:
 
 	friend class confirmation_height_prioritize_frontiers_Test;
 	friend class confirmation_height_prioritize_frontiers_overwrite_Test;
+	friend class confirmation_height_many_accounts_single_confirmation_Test;
+	friend class confirmation_height_many_accounts_many_confirmations_Test;
+	friend class confirmation_height_long_chains_Test;
 };
 
 std::unique_ptr<seq_con_info_component> collect_seq_con_info (active_transactions & active_transactions, const std::string & name);

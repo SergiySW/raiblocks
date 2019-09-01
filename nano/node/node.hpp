@@ -2,12 +2,14 @@
 
 #include <nano/boost/asio.hpp>
 #include <nano/lib/alarm.hpp>
+#include <nano/lib/rep_weights.hpp>
 #include <nano/lib/stats.hpp>
 #include <nano/lib/work.hpp>
 #include <nano/node/active_transactions.hpp>
 #include <nano/node/blockprocessor.hpp>
 #include <nano/node/bootstrap.hpp>
 #include <nano/node/confirmation_height_processor.hpp>
+#include <nano/node/distributed_work.hpp>
 #include <nano/node/election.hpp>
 #include <nano/node/gap_cache.hpp>
 #include <nano/node/logging.hpp>
@@ -72,22 +74,14 @@ public:
 
 std::unique_ptr<seq_con_info_component> collect_seq_con_info (block_arrival & block_arrival, const std::string & name);
 
-class node_init final
-{
-public:
-	bool error () const;
-	bool block_store_init{ false };
-	bool wallets_store_init{ false };
-};
-
 std::unique_ptr<seq_con_info_component> collect_seq_con_info (rep_crawler & rep_crawler, const std::string & name);
 std::unique_ptr<seq_con_info_component> collect_seq_con_info (block_processor & block_processor, const std::string & name);
 
 class node final : public std::enable_shared_from_this<nano::node>
 {
 public:
-	node (nano::node_init &, boost::asio::io_context &, uint16_t, boost::filesystem::path const &, nano::alarm &, nano::logging const &, nano::work_pool &, nano::node_flags = nano::node_flags ());
-	node (nano::node_init &, boost::asio::io_context &, boost::filesystem::path const &, nano::alarm &, nano::node_config const &, nano::work_pool &, nano::node_flags = nano::node_flags ());
+	node (boost::asio::io_context &, uint16_t, boost::filesystem::path const &, nano::alarm &, nano::logging const &, nano::work_pool &, nano::node_flags = nano::node_flags ());
+	node (boost::asio::io_context &, boost::filesystem::path const &, nano::alarm &, nano::node_config const &, nano::work_pool &, nano::node_flags = nano::node_flags ());
 	~node ();
 	template <typename T>
 	void background (T action_a)
@@ -105,7 +99,7 @@ public:
 	void process_confirmed (nano::election_status const &, uint8_t = 0);
 	void process_active (std::shared_ptr<nano::block>);
 	nano::process_return process (nano::block const &);
-	nano::process_return process_local (std::shared_ptr<nano::block>);
+	nano::process_return process_local (std::shared_ptr<nano::block>, bool const = false);
 	void keepalive_preconfigured (std::vector<std::string> const &);
 	nano::block_hash latest (nano::account const &);
 	nano::uint128_t balance (nano::account const &);
@@ -129,8 +123,8 @@ public:
 	void work_generate_blocking (nano::block &);
 	uint64_t work_generate_blocking (nano::uint256_union const &, uint64_t);
 	uint64_t work_generate_blocking (nano::uint256_union const &);
-	void work_generate (nano::uint256_union const &, std::function<void(uint64_t)>, uint64_t);
-	void work_generate (nano::uint256_union const &, std::function<void(uint64_t)>);
+	void work_generate (nano::uint256_union const &, std::function<void(boost::optional<uint64_t>)>, uint64_t);
+	void work_generate (nano::uint256_union const &, std::function<void(boost::optional<uint64_t>)>);
 	void add_initial_peers ();
 	void block_confirm (std::shared_ptr<nano::block>);
 	bool block_confirmed_or_being_confirmed (nano::transaction const &, nano::block_hash const &);
@@ -141,6 +135,8 @@ public:
 	void ongoing_online_weight_calculation ();
 	void ongoing_online_weight_calculation_queue ();
 	bool online () const;
+	bool init_error () const;
+	nano::worker worker;
 	nano::write_database_queue write_database_queue;
 	boost::asio::io_context & io_ctx;
 	boost::latch node_initialized_latch;
@@ -151,6 +147,7 @@ public:
 	nano::node_flags flags;
 	nano::alarm & alarm;
 	nano::work_pool & work;
+	nano::distributed_work_factory distributed_work;
 	nano::logger_mt logger;
 	std::unique_ptr<nano::block_store> store_impl;
 	nano::block_store & store;
@@ -183,6 +180,7 @@ public:
 	nano::wallets wallets;
 	const std::chrono::steady_clock::time_point startup_time;
 	std::chrono::seconds unchecked_cutoff = std::chrono::seconds (7 * 24 * 60 * 60); // Week
+	std::atomic<bool> unresponsive_work_peers{ false };
 	std::atomic<bool> stopped{ false };
 	static double constexpr price_max = 16.0;
 	static double constexpr free_cutoff = 1024.0;
@@ -190,16 +188,17 @@ public:
 
 std::unique_ptr<seq_con_info_component> collect_seq_con_info (node & node, const std::string & name);
 
+nano::node_flags const & inactive_node_flag_defaults ();
+
 class inactive_node final
 {
 public:
-	inactive_node (boost::filesystem::path const & path = nano::working_path (), uint16_t = 24000);
+	inactive_node (boost::filesystem::path const & path = nano::working_path (), uint16_t = 24000, nano::node_flags const & = nano::inactive_node_flag_defaults ());
 	~inactive_node ();
 	boost::filesystem::path path;
 	std::shared_ptr<boost::asio::io_context> io_context;
 	nano::alarm alarm;
 	nano::logging logging;
-	nano::node_init init;
 	nano::work_pool work;
 	uint16_t peering_port;
 	std::shared_ptr<nano::node> node;

@@ -27,10 +27,10 @@
 
 namespace
 {
-class matches_txn
+class matches_txn final
 {
 public:
-	matches_txn (const nano::transaction_impl * transaction_impl_a) :
+	explicit matches_txn (const nano::transaction_impl * transaction_impl_a) :
 	transaction_impl (transaction_impl_a)
 	{
 	}
@@ -108,6 +108,12 @@ void nano::write_mdb_txn::renew ()
 void * nano::write_mdb_txn::get_handle () const
 {
 	return handle;
+}
+
+bool nano::write_mdb_txn::contains (nano::tables table_a) const
+{
+	// LMDB locks on every write
+	return true;
 }
 
 nano::mdb_txn_tracker::mdb_txn_tracker (nano::logger_mt & logger_a, nano::txn_tracking_config const & txn_tracking_config_a, std::chrono::milliseconds block_processor_batch_max_time_a) :

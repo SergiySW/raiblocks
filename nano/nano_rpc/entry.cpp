@@ -43,7 +43,7 @@ void run (boost::filesystem::path const & data_path)
 	std::unique_ptr<nano::thread_runner> runner;
 
 	nano::rpc_config rpc_config;
-	auto error = nano::read_and_update_rpc_config (data_path, rpc_config);
+	auto error = nano::read_rpc_config_toml (data_path, rpc_config);
 	if (!error)
 	{
 		logging_init (data_path);
@@ -140,15 +140,8 @@ int main (int argc, char * const * argv)
 	}
 	else if (vm.count ("version"))
 	{
-		if (NANO_VERSION_PATCH == 0)
-		{
-			std::cout << "Version " << NANO_MAJOR_MINOR_VERSION << std::endl;
-		}
-		else
-		{
-			std::cout << "Version " << NANO_MAJOR_MINOR_RC_VERSION << std::endl;
-		}
-		std::cout << "Build Info " << BUILD_INFO << std::endl;
+		std::cout << "Version " << NANO_VERSION_STRING << "\n"
+		          << "Build Info " << BUILD_INFO << std::endl;
 	}
 	else
 	{
