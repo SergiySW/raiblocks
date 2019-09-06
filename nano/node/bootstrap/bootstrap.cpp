@@ -576,7 +576,7 @@ void nano::bootstrap_attempt::add_pull (nano::pull_info const & pull_a)
 void nano::bootstrap_attempt::requeue_pull (nano::pull_info const & pull_a)
 {
 	auto pull (pull_a);
-	if (++pull.attempts < (bootstrap_frontier_retry_limit + (pull.processed / 10000) + (pull.priority * bootstrap_frontier_retry_limit / 2)))
+	if (++pull.attempts < (nano::bootstrap_limits::bootstrap_frontier_retry_limit + (pull.processed / 10000) + (pull.priority * nano::bootstrap_limits::bootstrap_frontier_retry_limit / 2)))
 	{
 		nano::lock_guard<std::mutex> lock (mutex);
 		if (pull.priority)
