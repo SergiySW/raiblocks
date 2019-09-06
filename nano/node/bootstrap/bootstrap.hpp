@@ -87,6 +87,9 @@ public:
 	std::weak_ptr<nano::frontier_req_client> frontiers;
 	std::weak_ptr<nano::bulk_push_client> push;
 	std::deque<nano::pull_info> pulls;
+	std::deque<nano::pull_info> pulls_high;
+	std::deque<nano::pull_info> pulls_medium;
+	size_t pulls_size ();
 	std::deque<std::shared_ptr<nano::bootstrap_client>> idle;
 	std::atomic<unsigned> connections;
 	std::atomic<unsigned> pulling;
@@ -170,6 +173,8 @@ public:
 	bool in_progress ();
 	std::shared_ptr<nano::bootstrap_attempt> current_attempt ();
 	nano::pulls_cache cache;
+	std::unordered_set<nano::account> priority_accounts_high;
+	std::unordered_set<nano::account> priority_accounts_medium;
 	void stop ();
 
 private:

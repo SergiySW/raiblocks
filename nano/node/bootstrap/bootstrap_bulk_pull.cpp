@@ -62,12 +62,12 @@ void nano::bulk_pull_client::request ()
 	if (connection->node->config.logging.bulk_pull_logging ())
 	{
 		nano::unique_lock<std::mutex> lock (connection->attempt->mutex);
-		connection->node->logger.try_log (boost::str (boost::format ("Requesting account %1% from %2%. %3% accounts in queue") % pull.account.to_account () % connection->channel->to_string () % connection->attempt->pulls.size ()));
+		connection->node->logger.try_log (boost::str (boost::format ("Requesting account %1% from %2%. %3% accounts in queue") % pull.account.to_account () % connection->channel->to_string () % connection->attempt->pulls_size ()));
 	}
 	else if (connection->node->config.logging.network_logging () && connection->attempt->should_log ())
 	{
 		nano::unique_lock<std::mutex> lock (connection->attempt->mutex);
-		connection->node->logger.always_log (boost::str (boost::format ("%1% accounts in pull queue") % connection->attempt->pulls.size ()));
+		connection->node->logger.always_log (boost::str (boost::format ("%1% accounts in pull queue") % connection->attempt->pulls_size ()));
 	}
 	auto this_l (shared_from_this ());
 	connection->channel->send (

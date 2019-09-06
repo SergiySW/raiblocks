@@ -20,6 +20,7 @@ public:
 	count_t count{ 0 };
 	unsigned attempts{ 0 };
 	uint64_t processed{ 0 };
+	bool priority{ false };
 };
 class bootstrap_client;
 class bulk_pull_client final : public std::enable_shared_from_this<nano::bulk_pull_client>
