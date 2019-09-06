@@ -123,6 +123,7 @@ public:
 	std::shared_ptr<nano::block> change_action (nano::account const &, nano::account const &, uint64_t = 0, bool = true);
 	std::shared_ptr<nano::block> receive_action (nano::block const &, nano::account const &, nano::uint128_union const &, uint64_t = 0, bool = true);
 	std::shared_ptr<nano::block> send_action (nano::account const &, nano::account const &, nano::uint128_t const &, uint64_t = 0, bool = true, boost::optional<std::string> = {});
+	bool action_complete (std::shared_ptr<nano::block> const &, nano::account const &, bool const);
 	wallet (bool &, nano::transaction &, nano::wallets &, std::string const &);
 	wallet (bool &, nano::transaction &, nano::wallets &, std::string const &, std::string const &);
 	void enter_initial_password ();
@@ -210,7 +211,7 @@ public:
 	std::multimap<nano::uint128_t, std::pair<std::shared_ptr<nano::wallet>, std::function<void(nano::wallet &)>>, std::greater<nano::uint128_t>> actions;
 	std::mutex mutex;
 	std::mutex action_mutex;
-	std::condition_variable condition;
+	nano::condition_variable condition;
 	nano::kdf kdf;
 	MDB_dbi handle;
 	MDB_dbi send_action_ids;

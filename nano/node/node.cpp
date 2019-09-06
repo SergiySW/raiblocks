@@ -78,7 +78,7 @@ std::unique_ptr<seq_con_info_component> collect_seq_con_info (rep_crawler & rep_
 {
 	size_t count = 0;
 	{
-		std::lock_guard<std::mutex> guard (rep_crawler.active_mutex);
+		nano::lock_guard<std::mutex> guard (rep_crawler.active_mutex);
 		count = rep_crawler.active.size ();
 	}
 
@@ -92,15 +92,15 @@ std::unique_ptr<seq_con_info_component> collect_seq_con_info (block_processor & 
 {
 	size_t state_blocks_count = 0;
 	size_t blocks_count = 0;
-	size_t blocks_hashes_count = 0;
+	size_t blocks_filter_count = 0;
 	size_t forced_count = 0;
 	size_t rolled_back_count = 0;
 
 	{
-		std::lock_guard<std::mutex> guard (block_processor.mutex);
+		nano::lock_guard<std::mutex> guard (block_processor.mutex);
 		state_blocks_count = block_processor.state_blocks.size ();
 		blocks_count = block_processor.blocks.size ();
-		blocks_hashes_count = block_processor.blocks_hashes.size ();
+		blocks_filter_count = block_processor.blocks_filter.size ();
 		forced_count = block_processor.forced.size ();
 		rolled_back_count = block_processor.rolled_back.size ();
 	}
@@ -108,7 +108,7 @@ std::unique_ptr<seq_con_info_component> collect_seq_con_info (block_processor & 
 	auto composite = std::make_unique<seq_con_info_composite> (name);
 	composite->add_component (std::make_unique<seq_con_info_leaf> (seq_con_info{ "state_blocks", state_blocks_count, sizeof (decltype (block_processor.state_blocks)::value_type) }));
 	composite->add_component (std::make_unique<seq_con_info_leaf> (seq_con_info{ "blocks", blocks_count, sizeof (decltype (block_processor.blocks)::value_type) }));
-	composite->add_component (std::make_unique<seq_con_info_leaf> (seq_con_info{ "blocks_hashes", blocks_hashes_count, sizeof (decltype (block_processor.blocks_hashes)::value_type) }));
+	composite->add_component (std::make_unique<seq_con_info_leaf> (seq_con_info{ "blocks_filter", blocks_filter_count, sizeof (decltype (block_processor.blocks_filter)::value_type) }));
 	composite->add_component (std::make_unique<seq_con_info_leaf> (seq_con_info{ "forced", forced_count, sizeof (decltype (block_processor.forced)::value_type) }));
 	composite->add_component (std::make_unique<seq_con_info_leaf> (seq_con_info{ "rolled_back", rolled_back_count, sizeof (decltype (block_processor.rolled_back)::value_type) }));
 	composite->add_component (collect_seq_con_info (block_processor.generator, "generator"));
@@ -651,7 +651,6 @@ std::unique_ptr<seq_con_info_component> collect_seq_con_info (node & node, const
 	composite->add_component (collect_seq_con_info (node.bootstrap, "bootstrap"));
 	composite->add_component (node.network.tcp_channels.collect_seq_con_info ("tcp_channels"));
 	composite->add_component (node.network.udp_channels.collect_seq_con_info ("udp_channels"));
-	composite->add_component (node.network.response_channels.collect_seq_con_info ("response_channels"));
 	composite->add_component (node.network.syn_cookies.collect_seq_con_info ("syn_cookies"));
 	composite->add_component (collect_seq_con_info (node.observers, "observers"));
 	composite->add_component (collect_seq_con_info (node.wallets, "wallets"));
@@ -807,14 +806,14 @@ nano::uint128_t nano::node::weight (nano::account const & account_a)
 	return ledger.weight (transaction, account_a);
 }
 
-nano::account nano::node::representative (nano::account const & account_a)
+nano::block_hash nano::node::rep_block (nano::account const & account_a)
 {
 	auto transaction (store.tx_begin_read ());
 	nano::account_info info;
 	nano::account result (0);
 	if (!store.account_get (transaction, account_a, info))
 	{
-		result = info.rep_block;
+		result = ledger.representative (transaction, info.head);
 	}
 	return result;
 }
@@ -932,12 +931,12 @@ void nano::node::bootstrap_wallet ()
 {
 	std::deque<nano::account> accounts;
 	{
-		std::lock_guard<std::mutex> lock (wallets.mutex);
+		nano::lock_guard<std::mutex> lock (wallets.mutex);
 		auto transaction (wallets.tx_begin_read ());
 		for (auto i (wallets.items.begin ()), n (wallets.items.end ()); i != n && accounts.size () < 128; ++i)
 		{
 			auto & wallet (*i->second);
-			std::lock_guard<std::recursive_mutex> wallet_lock (wallet.store.mutex);
+			nano::lock_guard<std::recursive_mutex> wallet_lock (wallet.store.mutex);
 			for (auto j (wallet.store.begin (transaction)), m (wallet.store.end ()); j != m && accounts.size () < 128; ++j)
 			{
 				nano::account account (j->first);
@@ -966,6 +965,10 @@ void nano::node::unchecked_cleanup ()
 			}
 		}
 	}
+	if (!cleaning_list.empty ())
+	{
+		logger.always_log (boost::str (boost::format ("Deleting %1% old unchecked blocks") % cleaning_list.size ()));
+	}
 	// Delete old unchecked keys in batches
 	while (!cleaning_list.empty ())
 	{
@@ -982,7 +985,7 @@ void nano::node::unchecked_cleanup ()
 
 void nano::node::ongoing_unchecked_cleanup ()
 {
-	if (!bootstrap_initiator.in_progress ())
+	if (!bootstrap_initiator.in_progress () && ledger.block_count () >= ledger.bootstrap_weight_max_blocks)
 	{
 		unchecked_cleanup ();
 	}
@@ -1010,14 +1013,19 @@ int nano::node::price (nano::uint128_t const & balance_a, int amount_a)
 	return static_cast<int> (result * 100.0);
 }
 
-void nano::node::work_generate_blocking (nano::block & block_a)
+boost::optional<uint64_t> nano::node::work_generate_blocking (nano::block & block_a)
 {
-	work_generate_blocking (block_a, network_params.network.publish_threshold);
+	return work_generate_blocking (block_a, network_params.network.publish_threshold);
 }
 
-void nano::node::work_generate_blocking (nano::block & block_a, uint64_t difficulty_a)
+boost::optional<uint64_t> nano::node::work_generate_blocking (nano::block & block_a, uint64_t difficulty_a)
 {
-	block_a.block_work_set (work_generate_blocking (block_a.root (), difficulty_a));
+	auto opt_work_l (work_generate_blocking (block_a.root (), difficulty_a));
+	if (opt_work_l.is_initialized ())
+	{
+		block_a.block_work_set (*opt_work_l);
+	}
+	return opt_work_l;
 }
 
 void nano::node::work_generate (nano::uint256_union const & hash_a, std::function<void(boost::optional<uint64_t>)> callback_a)
@@ -1030,12 +1038,12 @@ void nano::node::work_generate (nano::uint256_union const & hash_a, std::functio
 	distributed_work.make (hash_a, callback_a, difficulty_a);
 }
 
-uint64_t nano::node::work_generate_blocking (nano::uint256_union const & block_a)
+boost::optional<uint64_t> nano::node::work_generate_blocking (nano::uint256_union const & block_a)
 {
 	return work_generate_blocking (block_a, network_params.network.publish_threshold);
 }
 
-uint64_t nano::node::work_generate_blocking (nano::uint256_union const & hash_a, uint64_t difficulty_a)
+boost::optional<uint64_t> nano::node::work_generate_blocking (nano::uint256_union const & hash_a, uint64_t difficulty_a)
 {
 	std::promise<uint64_t> promise;
 	std::future<uint64_t> future = promise.get_future ();
@@ -1266,7 +1274,7 @@ void nano::node::process_confirmed (nano::election_status const & status_a, uint
 
 bool nano::block_arrival::add (nano::block_hash const & hash_a)
 {
-	std::lock_guard<std::mutex> lock (mutex);
+	nano::lock_guard<std::mutex> lock (mutex);
 	auto now (std::chrono::steady_clock::now ());
 	auto inserted (arrival.insert (nano::block_arrival_info{ now, hash_a }));
 	auto result (!inserted.second);
@@ -1275,7 +1283,7 @@ bool nano::block_arrival::add (nano::block_hash const & hash_a)
 
 bool nano::block_arrival::recent (nano::block_hash const & hash_a)
 {
-	std::lock_guard<std::mutex> lock (mutex);
+	nano::lock_guard<std::mutex> lock (mutex);
 	auto now (std::chrono::steady_clock::now ());
 	while (arrival.size () > arrival_size_min && arrival.begin ()->arrival + arrival_time_min < now)
 	{
@@ -1290,7 +1298,7 @@ std::unique_ptr<seq_con_info_component> collect_seq_con_info (block_arrival & bl
 {
 	size_t count = 0;
 	{
-		std::lock_guard<std::mutex> guard (block_arrival.mutex);
+		nano::lock_guard<std::mutex> guard (block_arrival.mutex);
 		count = block_arrival.arrival.size ();
 	}
 

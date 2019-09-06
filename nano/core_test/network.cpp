@@ -130,11 +130,6 @@ TEST (network, send_node_id_handshake_tcp)
 		ASSERT_NO_ERROR (system.poll ());
 	}
 	system.deadline_set (5s);
-	while (system.nodes[0]->network.response_channels.size () != 1 || node1->network.response_channels.size () != 1)
-	{
-		ASSERT_NO_ERROR (system.poll ());
-	}
-	system.deadline_set (5s);
 	while (system.nodes[0]->stats.count (nano::stat::type::message, nano::stat::detail::keepalive, nano::stat::dir::in) < initial_keepalive + 2)
 	{
 		ASSERT_NO_ERROR (system.poll ());
@@ -817,10 +812,10 @@ TEST (bootstrap_processor, lazy_hash)
 	nano::keypair key1;
 	nano::keypair key2;
 	// Generating test chain
-	auto send1 (std::make_shared<nano::state_block> (nano::test_genesis_key.pub, genesis.hash (), nano::test_genesis_key.pub, nano::genesis_amount - nano::Gxrb_ratio, key1.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, system.nodes[0]->work_generate_blocking (genesis.hash ())));
-	auto receive1 (std::make_shared<nano::state_block> (key1.pub, 0, key1.pub, nano::Gxrb_ratio, send1->hash (), key1.prv, key1.pub, system.nodes[0]->work_generate_blocking (key1.pub)));
-	auto send2 (std::make_shared<nano::state_block> (key1.pub, receive1->hash (), key1.pub, 0, key2.pub, key1.prv, key1.pub, system.nodes[0]->work_generate_blocking (receive1->hash ())));
-	auto receive2 (std::make_shared<nano::state_block> (key2.pub, 0, key2.pub, nano::Gxrb_ratio, send2->hash (), key2.prv, key2.pub, system.nodes[0]->work_generate_blocking (key2.pub)));
+	auto send1 (std::make_shared<nano::state_block> (nano::test_genesis_key.pub, genesis.hash (), nano::test_genesis_key.pub, nano::genesis_amount - nano::Gxrb_ratio, key1.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.nodes[0]->work_generate_blocking (genesis.hash ())));
+	auto receive1 (std::make_shared<nano::state_block> (key1.pub, 0, key1.pub, nano::Gxrb_ratio, send1->hash (), key1.prv, key1.pub, *system.nodes[0]->work_generate_blocking (key1.pub)));
+	auto send2 (std::make_shared<nano::state_block> (key1.pub, receive1->hash (), key1.pub, 0, key2.pub, key1.prv, key1.pub, *system.nodes[0]->work_generate_blocking (receive1->hash ())));
+	auto receive2 (std::make_shared<nano::state_block> (key2.pub, 0, key2.pub, nano::Gxrb_ratio, send2->hash (), key2.prv, key2.pub, *system.nodes[0]->work_generate_blocking (key2.pub)));
 	// Processing test chain
 	system.nodes[0]->block_processor.add (send1);
 	system.nodes[0]->block_processor.add (receive1);
@@ -847,13 +842,13 @@ TEST (bootstrap_processor, lazy_max_pull_count)
 	nano::keypair key1;
 	nano::keypair key2;
 	// Generating test chain
-	auto send1 (std::make_shared<nano::state_block> (nano::test_genesis_key.pub, genesis.hash (), nano::test_genesis_key.pub, nano::genesis_amount - nano::Gxrb_ratio, key1.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, system.nodes[0]->work_generate_blocking (genesis.hash ())));
-	auto receive1 (std::make_shared<nano::state_block> (key1.pub, 0, key1.pub, nano::Gxrb_ratio, send1->hash (), key1.prv, key1.pub, system.nodes[0]->work_generate_blocking (key1.pub)));
-	auto send2 (std::make_shared<nano::state_block> (key1.pub, receive1->hash (), key1.pub, 0, key2.pub, key1.prv, key1.pub, system.nodes[0]->work_generate_blocking (receive1->hash ())));
-	auto receive2 (std::make_shared<nano::state_block> (key2.pub, 0, key2.pub, nano::Gxrb_ratio, send2->hash (), key2.prv, key2.pub, system.nodes[0]->work_generate_blocking (key2.pub)));
-	auto change1 (std::make_shared<nano::state_block> (key2.pub, receive2->hash (), key1.pub, nano::Gxrb_ratio, 0, key2.prv, key2.pub, system.nodes[0]->work_generate_blocking (receive2->hash ())));
-	auto change2 (std::make_shared<nano::state_block> (key2.pub, change1->hash (), nano::test_genesis_key.pub, nano::Gxrb_ratio, 0, key2.prv, key2.pub, system.nodes[0]->work_generate_blocking (change1->hash ())));
-	auto change3 (std::make_shared<nano::state_block> (key2.pub, change2->hash (), key2.pub, nano::Gxrb_ratio, 0, key2.prv, key2.pub, system.nodes[0]->work_generate_blocking (change2->hash ())));
+	auto send1 (std::make_shared<nano::state_block> (nano::test_genesis_key.pub, genesis.hash (), nano::test_genesis_key.pub, nano::genesis_amount - nano::Gxrb_ratio, key1.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.nodes[0]->work_generate_blocking (genesis.hash ())));
+	auto receive1 (std::make_shared<nano::state_block> (key1.pub, 0, key1.pub, nano::Gxrb_ratio, send1->hash (), key1.prv, key1.pub, *system.nodes[0]->work_generate_blocking (key1.pub)));
+	auto send2 (std::make_shared<nano::state_block> (key1.pub, receive1->hash (), key1.pub, 0, key2.pub, key1.prv, key1.pub, *system.nodes[0]->work_generate_blocking (receive1->hash ())));
+	auto receive2 (std::make_shared<nano::state_block> (key2.pub, 0, key2.pub, nano::Gxrb_ratio, send2->hash (), key2.prv, key2.pub, *system.nodes[0]->work_generate_blocking (key2.pub)));
+	auto change1 (std::make_shared<nano::state_block> (key2.pub, receive2->hash (), key1.pub, nano::Gxrb_ratio, 0, key2.prv, key2.pub, *system.nodes[0]->work_generate_blocking (receive2->hash ())));
+	auto change2 (std::make_shared<nano::state_block> (key2.pub, change1->hash (), nano::test_genesis_key.pub, nano::Gxrb_ratio, 0, key2.prv, key2.pub, *system.nodes[0]->work_generate_blocking (change1->hash ())));
+	auto change3 (std::make_shared<nano::state_block> (key2.pub, change2->hash (), key2.pub, nano::Gxrb_ratio, 0, key2.prv, key2.pub, *system.nodes[0]->work_generate_blocking (change2->hash ())));
 	// Processing test chain
 	system.nodes[0]->block_processor.add (send1);
 	system.nodes[0]->block_processor.add (receive1);
@@ -883,10 +878,10 @@ TEST (bootstrap_processor, wallet_lazy_frontier)
 	nano::keypair key1;
 	nano::keypair key2;
 	// Generating test chain
-	auto send1 (std::make_shared<nano::state_block> (nano::test_genesis_key.pub, genesis.hash (), nano::test_genesis_key.pub, nano::genesis_amount - nano::Gxrb_ratio, key1.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, system.nodes[0]->work_generate_blocking (genesis.hash ())));
-	auto receive1 (std::make_shared<nano::state_block> (key1.pub, 0, key1.pub, nano::Gxrb_ratio, send1->hash (), key1.prv, key1.pub, system.nodes[0]->work_generate_blocking (key1.pub)));
-	auto send2 (std::make_shared<nano::state_block> (key1.pub, receive1->hash (), key1.pub, 0, key2.pub, key1.prv, key1.pub, system.nodes[0]->work_generate_blocking (receive1->hash ())));
-	auto receive2 (std::make_shared<nano::state_block> (key2.pub, 0, key2.pub, nano::Gxrb_ratio, send2->hash (), key2.prv, key2.pub, system.nodes[0]->work_generate_blocking (key2.pub)));
+	auto send1 (std::make_shared<nano::state_block> (nano::test_genesis_key.pub, genesis.hash (), nano::test_genesis_key.pub, nano::genesis_amount - nano::Gxrb_ratio, key1.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.nodes[0]->work_generate_blocking (genesis.hash ())));
+	auto receive1 (std::make_shared<nano::state_block> (key1.pub, 0, key1.pub, nano::Gxrb_ratio, send1->hash (), key1.prv, key1.pub, *system.nodes[0]->work_generate_blocking (key1.pub)));
+	auto send2 (std::make_shared<nano::state_block> (key1.pub, receive1->hash (), key1.pub, 0, key2.pub, key1.prv, key1.pub, *system.nodes[0]->work_generate_blocking (receive1->hash ())));
+	auto receive2 (std::make_shared<nano::state_block> (key2.pub, 0, key2.pub, nano::Gxrb_ratio, send2->hash (), key2.prv, key2.pub, *system.nodes[0]->work_generate_blocking (key2.pub)));
 	// Processing test chain
 	system.nodes[0]->block_processor.add (send1);
 	system.nodes[0]->block_processor.add (receive1);
@@ -916,9 +911,9 @@ TEST (bootstrap_processor, wallet_lazy_pending)
 	nano::keypair key1;
 	nano::keypair key2;
 	// Generating test chain
-	auto send1 (std::make_shared<nano::state_block> (nano::test_genesis_key.pub, genesis.hash (), nano::test_genesis_key.pub, nano::genesis_amount - nano::Gxrb_ratio, key1.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, system.nodes[0]->work_generate_blocking (genesis.hash ())));
-	auto receive1 (std::make_shared<nano::state_block> (key1.pub, 0, key1.pub, nano::Gxrb_ratio, send1->hash (), key1.prv, key1.pub, system.nodes[0]->work_generate_blocking (key1.pub)));
-	auto send2 (std::make_shared<nano::state_block> (key1.pub, receive1->hash (), key1.pub, 0, key2.pub, key1.prv, key1.pub, system.nodes[0]->work_generate_blocking (receive1->hash ())));
+	auto send1 (std::make_shared<nano::state_block> (nano::test_genesis_key.pub, genesis.hash (), nano::test_genesis_key.pub, nano::genesis_amount - nano::Gxrb_ratio, key1.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, *system.nodes[0]->work_generate_blocking (genesis.hash ())));
+	auto receive1 (std::make_shared<nano::state_block> (key1.pub, 0, key1.pub, nano::Gxrb_ratio, send1->hash (), key1.prv, key1.pub, *system.nodes[0]->work_generate_blocking (key1.pub)));
+	auto send2 (std::make_shared<nano::state_block> (key1.pub, receive1->hash (), key1.pub, 0, key2.pub, key1.prv, key1.pub, *system.nodes[0]->work_generate_blocking (receive1->hash ())));
 	// Processing test chain
 	system.nodes[0]->block_processor.add (send1);
 	system.nodes[0]->block_processor.add (receive1);
@@ -2096,7 +2091,7 @@ TEST (confirmation_height, conflict_rollback_cemented)
 	node1.block_processor.flush ();
 	node2.network.process_message (publish1, channel2);
 	node2.block_processor.flush ();
-	std::unique_lock<std::mutex> lock (node2.active.mutex);
+	nano::unique_lock<std::mutex> lock (node2.active.mutex);
 	auto conflict (node2.active.roots.find (nano::qualified_root (genesis.hash (), genesis.hash ())));
 	ASSERT_NE (node2.active.roots.end (), conflict);
 	auto votes1 (conflict->election);
@@ -2180,19 +2175,24 @@ TEST (confirmation_height, modified_chain)
 		ASSERT_EQ (nano::process_result::progress, node->ledger.process (transaction, *send).code);
 	}
 
-	node->confirmation_height_processor.add (send->hash ());
-
 	{
 		// The write guard prevents the confirmation height processor doing any writes
 		auto write_guard = node->write_database_queue.wait (nano::writer::process_batch);
+		node->confirmation_height_processor.add (send->hash ());
+		system.deadline_set (10s);
 		while (!node->write_database_queue.contains (nano::writer::confirmation_height))
-			;
+		{
+			ASSERT_NO_ERROR (system.poll ());
+		}
 
 		store.block_del (store.tx_begin_write (), send->hash ());
 	}
 
+	system.deadline_set (10s);
 	while (node->write_database_queue.contains (nano::writer::confirmation_height))
-		;
+	{
+		ASSERT_NO_ERROR (system.poll ());
+	}
 
 	ASSERT_EQ (1, node->stats.count (nano::stat::type::confirmation_height, nano::stat::detail::invalid_block, nano::stat::dir::in));
 }
@@ -2233,7 +2233,7 @@ TEST (confirmation_height, pending_observer_callbacks)
 	// Can have timing issues.
 	node->confirmation_height_processor.add (send.hash ());
 	{
-		std::unique_lock<std::mutex> lk (node->pending_confirmation_height.mutex);
+		nano::unique_lock<std::mutex> lk (node->pending_confirmation_height.mutex);
 		while (!node->pending_confirmation_height.current_hash.is_zero ())
 		{
 			lk.unlock ();
@@ -2269,7 +2269,7 @@ TEST (bootstrap, tcp_listener_timeout_empty)
 	while (!disconnected)
 	{
 		{
-			std::lock_guard<std::mutex> guard (node0->bootstrap.mutex);
+			nano::lock_guard<std::mutex> guard (node0->bootstrap.mutex);
 			disconnected = node0->bootstrap.connections.empty ();
 		}
 		ASSERT_NO_ERROR (system.poll ());
@@ -2297,7 +2297,7 @@ TEST (bootstrap, tcp_listener_timeout_node_id_handshake)
 		ASSERT_NO_ERROR (system.poll ());
 	}
 	{
-		std::lock_guard<std::mutex> guard (node0->bootstrap.mutex);
+		nano::lock_guard<std::mutex> guard (node0->bootstrap.mutex);
 		ASSERT_EQ (node0->bootstrap.connections.size (), 1);
 	}
 	bool disconnected (false);
@@ -2305,7 +2305,7 @@ TEST (bootstrap, tcp_listener_timeout_node_id_handshake)
 	while (!disconnected)
 	{
 		{
-			std::lock_guard<std::mutex> guard (node0->bootstrap.mutex);
+			nano::lock_guard<std::mutex> guard (node0->bootstrap.mutex);
 			disconnected = node0->bootstrap.connections.empty ();
 		}
 		ASSERT_NO_ERROR (system.poll ());
