@@ -43,6 +43,12 @@ enum class bootstrap_mode
 	lazy,
 	wallet_lazy
 };
+class confirm_req_item final
+{
+public:
+	nano::block_hash hash;
+	uint64_t count;
+};
 class frontier_req_client;
 class bulk_push_client;
 class bootstrap_attempt final : public std::enable_shared_from_this<bootstrap_attempt>
@@ -68,18 +74,27 @@ public:
 	bool should_log ();
 	void add_bulk_push_target (nano::block_hash const &, nano::block_hash const &);
 	bool process_block (std::shared_ptr<nano::block>, nano::account const &, uint64_t, bool);
-	bool process_block_lazy (std::shared_ptr<nano::block>, nano::account const &, uint64_t);
+	/** Lazy bootstrap */
 	void lazy_run ();
 	void lazy_start (nano::block_hash const &);
 	void lazy_add (nano::block_hash const &);
+	void lazy_requeue (nano::block_hash const &);
 	bool lazy_finished ();
 	void lazy_pull_flush ();
 	void lazy_clear ();
+	bool process_block_lazy (std::shared_ptr<nano::block>, nano::account const &, uint64_t);
+	void lazy_block_state (std::shared_ptr<nano::block>);
+	void lazy_block_state_backlog_check (std::shared_ptr<nano::block>, nano::block_hash const &);
+	bool lazy_processed_or_exists (nano::block_hash const &);
+	void send_confirm_req (nano::unique_lock<std::mutex> &, bool);
+	/** Lazy bootstrap */
+	/** Wallet bootstrap */
 	void request_pending (nano::unique_lock<std::mutex> &);
 	void requeue_pending (nano::account const &);
 	void wallet_run ();
 	void wallet_start (std::deque<nano::account> &);
 	bool wallet_finished ();
+	/** Wallet bootstrap */
 	std::mutex next_log_mutex;
 	std::chrono::steady_clock::time_point next_log;
 	std::deque<std::weak_ptr<nano::bootstrap_client>> clients;
@@ -101,12 +116,24 @@ public:
 	nano::condition_variable condition;
 	// Lazy bootstrap
 	std::unordered_set<nano::block_hash> lazy_blocks;
-	std::unordered_map<nano::block_hash, std::pair<nano::block_hash, nano::uint128_t>> lazy_state_unknown;
+	std::unordered_map<nano::block_hash, std::pair<nano::block_hash, nano::uint128_t>> lazy_state_backlog;
 	std::unordered_map<nano::block_hash, nano::uint128_t> lazy_balances;
 	std::unordered_set<nano::block_hash> lazy_keys;
 	std::deque<nano::block_hash> lazy_pulls;
-	std::atomic<uint64_t> lazy_stopped;
-	uint64_t lazy_max_stopped = 256;
+	class hash_tag
+	{
+	};
+	class count_tag
+	{
+	};
+	boost::multi_index_container<
+	confirm_req_item,
+	boost::multi_index::indexed_by<
+	boost::multi_index::ordered_non_unique<boost::multi_index::tag<count_tag>, boost::multi_index::member<confirm_req_item, uint64_t, &confirm_req_item::count>, std::less<uint64_t>>,
+	boost::multi_index::hashed_unique<boost::multi_index::tag<hash_tag>, boost::multi_index::member<confirm_req_item, nano::block_hash, &confirm_req_item::hash>>>>
+	confirm_req_list;
+	std::atomic<bool> confirm_req_ongoing{ false };
+	size_t max_confirm_req = 256;
 	std::mutex lazy_mutex;
 	// Wallet lazy bootstrap
 	std::deque<nano::account> wallet_accounts;

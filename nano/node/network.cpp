@@ -389,6 +389,50 @@ void nano::network::broadcast_confirm_req_batch (std::deque<std::pair<std::share
 	}
 }
 
+void nano::network::broadcast_confirm_req_hashes (std::deque<std::pair<nano::block_hash, nano::block_hash>> request_bundle_a, std::shared_ptr<std::vector<std::shared_ptr<nano::transport::channel>>> endpoints_a, unsigned delay_a, bool resumption, std::function<void()> const & callback_a)
+{
+	const size_t max_requests = 10;
+	if (endpoints_a == nullptr)
+	{
+		endpoints_a = std::make_shared<std::vector<std::shared_ptr<nano::transport::channel>>> (node.rep_crawler.representative_endpoints (std::numeric_limits<size_t>::max ()));
+	}
+	if (!resumption && node.config.logging.network_logging ())
+	{
+		node.logger.try_log (boost::str (boost::format ("Broadcasting batch confirm req for %1% hashes/roots to %2% representatives") % request_bundle_a.size () % endpoints_a->size ()));
+	}
+	auto count (0);
+	while (!request_bundle_a.empty () && count < max_requests)
+	{
+		++count;
+		std::vector<std::pair<nano::block_hash, nano::block_hash>> roots_hashes;
+		// Limit max request size hash + root to 7 pairs
+		while (roots_hashes.size () < confirm_req_hashes_max && !request_bundle_a.empty ())
+		{
+			roots_hashes.push_back (request_bundle_a.front ());
+			request_bundle_a.pop_front ();
+		}
+		nano::confirm_req req (roots_hashes);
+		for (auto & channel : *endpoints_a)
+		{
+			channel->send (req);
+		}
+	}
+	if (!request_bundle_a.empty ())
+	{
+		std::weak_ptr<nano::node> node_w (node.shared ());
+		node.alarm.add (std::chrono::steady_clock::now () + std::chrono::milliseconds (delay_a), [node_w, request_bundle_a, endpoints_a, delay_a, callback_a]() {
+			if (auto node_l = node_w.lock ())
+			{
+				node_l->network.broadcast_confirm_req_hashes (request_bundle_a, endpoints_a, delay_a, true, callback_a);
+			}
+		});
+	}
+	else
+	{
+		callback_a ();
+	}
+}
+
 namespace
 {
 class network_message_visitor : public nano::message_visitor
@@ -474,7 +518,7 @@ public:
 					{
 						blocks_bundle.push_back (root_hash.first);
 					}
-					else
+					else if (!root_hash.second.is_zero ())
 					{
 						nano::block_hash successor (0);
 						// Search for block root
@@ -683,17 +727,18 @@ void nano::network::random_fill (std::array<nano::endpoint, 8> & target_a) const
 	}
 }
 
-nano::tcp_endpoint nano::network::bootstrap_peer ()
+nano::tcp_endpoint nano::network::bootstrap_peer (bool lazy_bootstrap)
 {
 	nano::tcp_endpoint result (boost::asio::ip::address_v6::any (), 0);
 	bool use_udp_peer (nano::random_pool::generate_word32 (0, 1));
+	auto protocol_min (lazy_bootstrap ? node.network_params.protocol.protocol_version_bootstrap_lazy_min : node.network_params.protocol.protocol_version_bootstrap_min);
 	if (use_udp_peer || tcp_channels.size () == 0)
 	{
-		result = udp_channels.bootstrap_peer (node.network_params.protocol.protocol_version_bootstrap_min);
+		result = udp_channels.bootstrap_peer (protocol_min);
 	}
 	if (result == nano::tcp_endpoint (boost::asio::ip::address_v6::any (), 0))
 	{
-		result = tcp_channels.bootstrap_peer ();
+		result = tcp_channels.bootstrap_peer (protocol_min);
 	}
 	return result;
 }
