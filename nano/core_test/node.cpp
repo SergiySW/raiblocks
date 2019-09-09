@@ -253,7 +253,7 @@ TEST (node, auto_bootstrap)
 	while (node1->bootstrap_initiator.in_progress ())
 	{
 		ASSERT_NO_ERROR (system.poll ());
-	};
+	}
 	system.deadline_set (5s);
 	while (node1->stats.count (nano::stat::type::observer, nano::stat::detail::observer_confirmation_active_quorum, nano::stat::dir::out) + node1->stats.count (nano::stat::type::observer, nano::stat::detail::observer_confirmation_active_conf_height, nano::stat::dir::out) < 2)
 	{
@@ -1146,7 +1146,7 @@ TEST (node, fork_publish)
 		ASSERT_NE (election->last_votes.end (), existing1);
 		ASSERT_EQ (send1->hash (), existing1->second.hash);
 		auto transaction (node1.store.tx_begin_read ());
-		auto winner (*election->tally (transaction).begin ());
+		auto winner (*election->tally ().begin ());
 		ASSERT_EQ (*send1, *winner.second);
 		ASSERT_EQ (nano::genesis_amount - 100, winner.first);
 	}
@@ -1199,7 +1199,7 @@ TEST (node, fork_keep)
 	auto transaction1 (system.nodes[1]->store.tx_begin_read ());
 	// The vote should be in agreement with what we already have.
 	lock.lock ();
-	auto winner (*votes1->tally (transaction1).begin ());
+	auto winner (*votes1->tally ().begin ());
 	ASSERT_EQ (*send1, *winner.second);
 	ASSERT_EQ (nano::genesis_amount - 100, winner.first);
 	ASSERT_TRUE (system.nodes[0]->store.block_exists (transaction0, send1->hash ()));
@@ -1257,7 +1257,7 @@ TEST (node, fork_flip)
 	auto transaction1 (system.nodes[0]->store.tx_begin_read ());
 	auto transaction2 (system.nodes[1]->store.tx_begin_read ());
 	lock.lock ();
-	auto winner (*votes1->tally (transaction2).begin ());
+	auto winner (*votes1->tally ().begin ());
 	ASSERT_EQ (*publish1.block, *winner.second);
 	ASSERT_EQ (nano::genesis_amount - 100, winner.first);
 	ASSERT_TRUE (node1.store.block_exists (transaction1, publish1.block->hash ()));
@@ -1319,7 +1319,7 @@ TEST (node, fork_multi_flip)
 	auto transaction1 (system.nodes[0]->store.tx_begin_read ());
 	auto transaction2 (system.nodes[1]->store.tx_begin_read ());
 	lock.lock ();
-	auto winner (*votes1->tally (transaction2).begin ());
+	auto winner (*votes1->tally ().begin ());
 	ASSERT_EQ (*publish1.block, *winner.second);
 	ASSERT_EQ (nano::genesis_amount - 100, winner.first);
 	ASSERT_TRUE (node1.store.block_exists (transaction1, publish1.block->hash ()));
@@ -1445,7 +1445,7 @@ TEST (node, fork_open_flip)
 	auto transaction1 (system.nodes[0]->store.tx_begin_read ());
 	auto transaction2 (system.nodes[1]->store.tx_begin_read ());
 	lock.lock ();
-	auto winner (*votes1->tally (transaction2).begin ());
+	auto winner (*votes1->tally ().begin ());
 	ASSERT_EQ (*open1, *winner.second);
 	ASSERT_EQ (nano::genesis_amount - 1, winner.first);
 	ASSERT_TRUE (node1.store.block_exists (transaction1, open1->hash ()));
@@ -2475,7 +2475,7 @@ TEST (node, vote_by_hash_bundle)
 	system.wallet (0)->insert_adhoc (key1.prv);
 
 	std::atomic<size_t> max_hashes{ 0 };
-	system.nodes[0]->observers.vote.add ([&max_hashes](nano::transaction const & transaction, std::shared_ptr<nano::vote> vote_a, std::shared_ptr<nano::transport::channel> channel_a) {
+	system.nodes[0]->observers.vote.add ([&max_hashes](std::shared_ptr<nano::vote> vote_a, std::shared_ptr<nano::transport::channel> channel_a) {
 		if (vote_a->blocks.size () > max_hashes)
 		{
 			max_hashes = vote_a->blocks.size ();
@@ -2549,12 +2549,9 @@ TEST (node, vote_by_hash_epoch_block_republish)
 	nano::system system (24000, 2);
 	nano::keypair key2;
 	system.wallet (1)->insert_adhoc (key2.prv);
-	nano::keypair epoch_signer;
-	system.nodes[0]->ledger.epoch_signer = epoch_signer.pub;
-	system.nodes[1]->ledger.epoch_signer = epoch_signer.pub;
 	nano::genesis genesis;
 	auto send1 (std::make_shared<nano::send_block> (genesis.hash (), key2.pub, std::numeric_limits<nano::uint128_t>::max () - system.nodes[0]->config.receive_minimum.number (), nano::test_genesis_key.prv, nano::test_genesis_key.pub, system.work.generate (genesis.hash ())));
-	auto epoch1 (std::make_shared<nano::state_block> (nano::genesis_account, genesis.hash (), nano::genesis_account, nano::genesis_amount, system.nodes[0]->ledger.epoch_link, epoch_signer.prv, epoch_signer.pub, system.work.generate (genesis.hash ())));
+	auto epoch1 (std::make_shared<nano::state_block> (nano::genesis_account, genesis.hash (), nano::genesis_account, nano::genesis_amount, system.nodes[0]->ledger.link (nano::epoch::epoch_1), nano::test_genesis_key.prv, nano::test_genesis_key.pub, system.work.generate (genesis.hash ())));
 	system.nodes[0]->process_active (send1);
 	system.deadline_set (5s);
 	while (!system.nodes[1]->block (send1->hash ()))
@@ -2594,7 +2591,7 @@ TEST (node, epoch_conflict_confirm)
 	auto send (std::make_shared<nano::state_block> (nano::test_genesis_key.pub, genesis.hash (), nano::test_genesis_key.pub, nano::genesis_amount - 1, key.pub, nano::test_genesis_key.prv, nano::test_genesis_key.pub, system.work.generate (genesis.hash ())));
 	auto open (std::make_shared<nano::state_block> (key.pub, 0, key.pub, 1, send->hash (), key.prv, key.pub, system.work.generate (key.pub)));
 	auto change (std::make_shared<nano::state_block> (key.pub, open->hash (), key.pub, 1, 0, key.prv, key.pub, system.work.generate (open->hash ())));
-	auto epoch (std::make_shared<nano::state_block> (change->root (), 0, 0, 0, node0->ledger.epoch_link, epoch_signer.prv, epoch_signer.pub, system.work.generate (open->hash ())));
+	auto epoch (std::make_shared<nano::state_block> (change->root (), 0, 0, 0, node0->ledger.link (nano::epoch::epoch_1), epoch_signer.prv, epoch_signer.pub, system.work.generate (open->hash ())));
 	{
 		auto transaction (node0->store.tx_begin_write ());
 		ASSERT_EQ (nano::process_result::progress, node0->block_processor.process_one (transaction, send).code);
@@ -3058,8 +3055,9 @@ TEST (node, dont_write_lock_node)
 			nano::genesis genesis;
 			nano::rep_weights rep_weights;
 			std::atomic<uint64_t> cemented_count{ 0 };
+			std::atomic<uint64_t> block_count_cache{ 0 };
 			auto transaction (store->tx_begin_write ());
-			store->initialize (transaction, genesis, rep_weights, cemented_count);
+			store->initialize (transaction, genesis, rep_weights, cemented_count, block_count_cache);
 		}
 
 		// Hold write lock open until main thread is done needing it

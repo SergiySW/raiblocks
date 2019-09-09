@@ -24,13 +24,14 @@ public:
 	 * If using a different store version than the latest then you may need
 	 * to modify some of the objects in the store to be appropriate for the version before an upgrade.
 	 */
-	void initialize (nano::write_transaction const & transaction_a, nano::genesis const & genesis_a, nano::rep_weights & rep_weights, std::atomic<uint64_t> & cemented_count) override
+	void initialize (nano::write_transaction const & transaction_a, nano::genesis const & genesis_a, nano::rep_weights & rep_weights, std::atomic<uint64_t> & cemented_count, std::atomic<uint64_t> & block_count_cache) override
 	{
 		auto hash_l (genesis_a.hash ());
 		assert (latest_v0_begin (transaction_a) == latest_v0_end ());
 		assert (latest_v1_begin (transaction_a) == latest_v1_end ());
 		nano::block_sideband sideband (nano::block_type::open, network_params.ledger.genesis_account, 0, network_params.ledger.genesis_amount, 1, nano::seconds_since_epoch ());
 		block_put (transaction_a, hash_l, *genesis_a.open, sideband);
+		++block_count_cache;
 		confirmation_height_put (transaction_a, network_params.ledger.genesis_account, 1);
 		++cemented_count;
 		account_put (transaction_a, network_params.ledger.genesis_account, { hash_l, network_params.ledger.genesis_account, genesis_a.open->hash (), std::numeric_limits<nano::uint128_t>::max (), nano::seconds_since_epoch (), 1, nano::epoch::epoch_0 });
@@ -623,7 +624,7 @@ public:
 		// Check we are still in sync with other tables
 		assert (confirmation_height_exists (transaction_a, account_a));
 		nano::db_val<Val> info (info_a);
-		auto status = put (transaction_a, get_account_db (info_a.epoch), account_a, info);
+		auto status = put (transaction_a, get_account_db (info_a.epoch ()), account_a, info);
 		release_assert (success (status));
 	}
 
@@ -666,7 +667,7 @@ public:
 		if (!result)
 		{
 			nano::bufferstream stream (reinterpret_cast<uint8_t const *> (value.data ()), value.size ());
-			info_a.epoch = epoch;
+			info_a.epoch_m = epoch;
 			result = info_a.deserialize (stream);
 		}
 		return result;

@@ -1980,12 +1980,9 @@ TEST (confirmation_height, all_block_types)
 
 	nano::state_block state_change (key2.pub, state_send.hash (), nano::test_genesis_key.pub, nano::Gxrb_ratio, 0, key2.prv, key2.pub, system.work.generate (state_send.hash ()));
 
-	nano::keypair epoch_key;
-	node->ledger.epoch_signer = epoch_key.pub;
+	nano::state_block epoch (key2.pub, state_change.hash (), nano::test_genesis_key.pub, nano::Gxrb_ratio, node->ledger.link (nano::epoch::epoch_1), nano::test_genesis_key.prv, nano::test_genesis_key.pub, system.work.generate (state_change.hash ()));
 
-	nano::state_block epoch (key2.pub, state_change.hash (), nano::test_genesis_key.pub, nano::Gxrb_ratio, node->ledger.epoch_link, epoch_key.prv, epoch_key.pub, system.work.generate (state_change.hash ()));
-
-	nano::state_block epoch1 (key1.pub, change.hash (), key2.pub, nano::Gxrb_ratio, node->ledger.epoch_link, epoch_key.prv, epoch_key.pub, system.work.generate (change.hash ()));
+	nano::state_block epoch1 (key1.pub, change.hash (), key2.pub, nano::Gxrb_ratio, node->ledger.link (nano::epoch::epoch_1), nano::test_genesis_key.prv, nano::test_genesis_key.pub, system.work.generate (change.hash ()));
 	nano::state_block state_send1 (key1.pub, epoch1.hash (), 0, nano::Gxrb_ratio - 1, key2.pub, key1.prv, key1.pub, system.work.generate (epoch1.hash ()));
 	nano::state_block state_receive2 (key2.pub, epoch.hash (), 0, nano::Gxrb_ratio + 1, state_send1.hash (), key2.prv, key2.pub, system.work.generate (epoch.hash ()));
 
@@ -2121,7 +2118,7 @@ TEST (confirmation_height, conflict_rollback_cemented)
 	auto transaction1 (system.nodes[0]->store.tx_begin_read ());
 	auto transaction2 (system.nodes[1]->store.tx_begin_read ());
 	lock.lock ();
-	auto winner (*votes1->tally (transaction2).begin ());
+	auto winner (*votes1->tally ().begin ());
 	ASSERT_EQ (*publish1.block, *winner.second);
 	ASSERT_EQ (nano::genesis_amount - 100, winner.first);
 	ASSERT_TRUE (node1.store.block_exists (transaction1, publish1.block->hash ()));

@@ -166,7 +166,7 @@ public:
 	explicit operator nano::account_info () const
 	{
 		nano::account_info result;
-		result.epoch = epoch;
+		result.epoch_m = epoch;
 		assert (size () == result.db_size ());
 		std::copy (reinterpret_cast<uint8_t const *> (data ()), reinterpret_cast<uint8_t const *> (data ()) + result.db_size (), reinterpret_cast<uint8_t *> (&result));
 		return result;
@@ -659,7 +659,7 @@ class block_store
 {
 public:
 	virtual ~block_store () = default;
-	virtual void initialize (nano::write_transaction const &, nano::genesis const &, nano::rep_weights &, std::atomic<uint64_t> &) = 0;
+	virtual void initialize (nano::write_transaction const &, nano::genesis const &, nano::rep_weights &, std::atomic<uint64_t> &, std::atomic<uint64_t> &) = 0;
 	virtual void block_put (nano::write_transaction const &, nano::block_hash const &, nano::block const &, nano::block_sideband const &, nano::epoch version = nano::epoch::epoch_0) = 0;
 	virtual nano::block_hash block_successor (nano::transaction const &, nano::block_hash const &) const = 0;
 	virtual void block_successor_clear (nano::write_transaction const &, nano::block_hash const &) = 0;
