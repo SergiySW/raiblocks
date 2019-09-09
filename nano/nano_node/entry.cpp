@@ -128,6 +128,7 @@ int main (int argc, char * const * argv)
 		("debug_random_feed", "Generates output to RNG test suites")
 		("debug_rpc", "Read an RPC command from stdin and invoke it. Network operations will have no effect.")
 		("debug_validate_blocks", "Check all blocks for correct hash, signature, work value")
+		("debug_bootstrap_lazy", "Find heavy state blocks")
 		("debug_peers", "Display peer IPv6:port connections")
 		("debug_cemented_block_count", "Displays the number of cemented (confirmed) blocks")
 		("platform", boost::program_options::value<std::string> (), "Defines the <platform> for OpenCL commands")
@@ -1004,6 +1005,60 @@ int main (int argc, char * const * argv)
 				}
 			}
 			std::cout << boost::str (boost::format ("%1% pending blocks validated\n") % count);
+		}
+		else if (vm.count ("debug_bootstrap_lazy"))
+		{
+			nano::inactive_node node (data_path);
+			auto transaction (node.node->store.tx_begin_read ());
+			std::cout << boost::str (boost::format ("Performing heavy bootstrap blocks calculation...\n"));
+			size_t count (0);
+			size_t open_count (0);
+			size_t receive_count (0);
+			size_t change_count (0);
+			for (auto i (node.node->store.latest_begin (transaction)), n (node.node->store.latest_end ()); i != n; ++i)
+			{
+				++count;
+				if ((count % 100000) == 0)
+				{
+					std::cout << boost::str (boost::format ("%1% accounts checked\n") % count);
+				}
+				nano::account_info const & info (i->second);
+				nano::account const & account (i->first);
+
+				auto hash (info.open_block);
+				auto block (node.node->store.block_get (transaction, hash)); // Block data
+				while (!hash.is_zero () && block != nullptr && block->type () != nano::block_type::state)
+				{
+					// Retrieving successor block hash
+					hash = node.node->store.block_successor (transaction, hash);
+					// Retrieving block data
+					if (!hash.is_zero ())
+					{
+						auto block_successor (node.node->store.block_get (transaction, hash));
+						if (block_successor->type () == nano::block_type::state && !block_successor->link ().is_zero () && !node.node->ledger.is_epoch_link (block_successor->link ()))
+						{
+							auto state (dynamic_cast<nano::state_block *> (block_successor.get ()));
+							if (!node.node->ledger.is_send (transaction, *state))
+							{
+								if (block->type () == nano::block_type::open)
+								{
+									++open_count;
+								}
+								else if (block->type () == nano::block_type::receive)
+								{
+									++receive_count;
+								}
+								else if (block->type () == nano::block_type::change)
+								{
+									++change_count;
+								}
+							}
+						}
+						block = block_successor;
+					}
+				}
+			}
+			std::cout << boost::str (boost::format ("%1% accounts checked\nReceive: %2%\nOpen: %3%\nChange: %4%\n") % count % receive_count % open_count % change_count);
 		}
 		else if (vm.count ("debug_profile_bootstrap"))
 		{

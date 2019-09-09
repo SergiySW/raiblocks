@@ -565,10 +565,11 @@ void nano::bootstrap_attempt::lazy_start (nano::block_hash const & hash_a)
 	nano::unique_lock<std::mutex> lock (lazy_mutex);
 	// Add start blocks, limit 1024 (32k with disabled legacy bootstrap)
 	size_t max_keys (node->flags.disable_legacy_bootstrap ? 32 * 1024 : 1024);
-	if (lazy_keys.size () < max_keys && lazy_keys.find (hash_a) == lazy_keys.end () && lazy_blocks.find (hash_a) == lazy_blocks.end ())
+	if ((lazy_keys.size () < max_keys || confirm_req_list.get<hash_tag> ().find (hash_a) != confirm_req_list.get<hash_tag> ().end ()) && lazy_keys.find (hash_a) == lazy_keys.end () && lazy_blocks.find (hash_a) == lazy_blocks.end ())
 	{
 		lazy_keys.insert (hash_a);
 		lazy_pulls.push_back (hash_a);
+		confirm_req_list.get<hash_tag> ().erase (hash_a);
 	}
 }
 
@@ -631,7 +632,7 @@ bool nano::bootstrap_attempt::lazy_finished ()
 		}
 	}
 	// Finish lazy bootstrap without lazy pulls (in combination with still_pulling ())
-	if (!result && lazy_pulls.empty ())
+	if (!result && lazy_pulls.empty () && confirm_req_list.empty ())
 	{
 		result = true;
 	}
@@ -646,6 +647,7 @@ void nano::bootstrap_attempt::lazy_clear ()
 	lazy_pulls.clear ();
 	lazy_state_backlog.clear ();
 	lazy_balances.clear ();
+	confirm_req_list.clear ();
 }
 
 void nano::bootstrap_attempt::lazy_run ()
@@ -677,10 +679,16 @@ void nano::bootstrap_attempt::lazy_run ()
 			if (iterations % 100 == 0)
 			{
 				lazy_pull_flush ();
+				// Send extra confirmation requests for unknown links
+				if (iterations % 25000 == 0 || pulls.empty ())
+				{
+					send_confirm_req (lock, false);
+				}
 			}
 		}
 		// Flushing lazy pulls
 		lazy_pull_flush ();
+		send_confirm_req (lock, true);
 	}
 	if (!stopped)
 	{
@@ -766,6 +774,7 @@ bool nano::bootstrap_attempt::process_block_lazy (std::shared_ptr<nano::block> b
 			lazy_balances.erase (block_a->previous ());
 		}
 		lazy_block_state_backlog_check (block_a, hash);
+		confirm_req_list.get<hash_tag> ().erase (hash);
 	}
 	// Force drop lazy bootstrap connection for long bulk_pull
 	if (pull_blocks > node->network_params.bootstrap.lazy_max_pull_blocks)
@@ -837,10 +846,10 @@ void nano::bootstrap_attempt::lazy_block_state_backlog_check (std::shared_ptr<na
 				lazy_add (next_block.first);
 			}
 		}
-		// Assumption for other legacy block types
+		// Assumption for other legacy block types, send confirm_req
 		else
 		{
-			// Disabled
+			confirm_req_list.insert (nano::confirm_req_item{ next_block.first, 0 });
 		}
 		lazy_state_backlog.erase (find_state);
 	}
@@ -863,6 +872,44 @@ bool nano::bootstrap_attempt::lazy_processed_or_exists (nano::block_hash const &
 		}
 	}
 	return result;
+}
+
+void nano::bootstrap_attempt::send_confirm_req (nano::unique_lock<std::mutex> & lock_a, bool wait_required)
+{
+	if (!confirm_req_ongoing)
+	{
+		assert (!mutex.try_lock ());
+		std::deque<std::pair<nano::block_hash, nano::block_hash>> requests;
+		nano::unique_lock<std::mutex> lazy_lock (lazy_mutex);
+		for (auto i (confirm_req_list.get<count_tag> ().begin ()), n (confirm_req_list.get<count_tag> ().end ()); i != n && requests.size () < max_confirm_req; ++i)
+		{
+			requests.push_back (std::make_pair (i->hash, nano::uint256_union (0)));
+		}
+		for (auto & i : requests)
+		{
+			auto existing (confirm_req_list.get<hash_tag> ().find (i.first));
+			confirm_req_list.get<hash_tag> ().modify (existing, [](nano::confirm_req_item & item_a) {
+				++item_a.count;
+			});
+		}
+		lazy_lock.unlock ();
+		if (!requests.empty ())
+		{
+			confirm_req_ongoing = true;
+			std::weak_ptr<nano::bootstrap_attempt> this_w (shared_from_this ());
+			node->network.broadcast_confirm_req_hashes (requests, nullptr, 50, false, [this_w]() {
+				if (auto this_l = this_w.lock ())
+				{
+					this_l->confirm_req_ongoing = false;
+				}
+			});
+		}
+	}
+	else if (!wait_required)
+	{
+		auto this_l (shared_from_this ());
+		condition.wait_for (lock_a, std::chrono::seconds (2), [this_l]() { return !this_l->confirm_req_ongoing; });
+	}
 }
 
 void nano::bootstrap_attempt::request_pending (nano::unique_lock<std::mutex> & lock_a)
