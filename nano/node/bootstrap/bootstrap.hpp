@@ -85,8 +85,9 @@ public:
 	bool process_block_lazy (std::shared_ptr<nano::block>, nano::account const &, uint64_t);
 	void lazy_block_state (std::shared_ptr<nano::block>);
 	void lazy_block_state_backlog_check (std::shared_ptr<nano::block>, nano::block_hash const &);
-	bool lazy_processed_or_exists (nano::block_hash const &);
 	void send_confirm_req (nano::unique_lock<std::mutex> &, bool);
+	void lazy_backlog_cleanup ();
+	bool lazy_processed_or_exists (nano::block_hash const &);
 	/** Lazy bootstrap */
 	/** Wallet bootstrap */
 	void request_pending (nano::unique_lock<std::mutex> &);
