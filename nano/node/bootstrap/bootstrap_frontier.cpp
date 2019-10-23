@@ -62,7 +62,7 @@ void nano::frontier_req_client::receive_frontier ()
 		{
 			//if (this_l->connection->node->config.logging.network_message_logging ())
 			//{
-				this_l->connection->node->logger.try_log (boost::str (boost::format ("Invalid size: expected %1%, got %2% from %3%") % nano::frontier_req_client::size_frontier % size_a % connection->channel->to_string ()));
+				this_l->connection->node->logger.try_log (boost::str (boost::format ("Invalid size: expected %1%, got %2% from %3%") % nano::frontier_req_client::size_frontier % size_a % this_l->connection->channel->to_string ()));
 			//}
 		}
 	});
