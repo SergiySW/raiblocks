@@ -122,17 +122,17 @@ bool nano::bootstrap_attempt::request_frontier (nano::unique_lock<std::mutex> & 
 		{
 			pulls.clear ();
 		}
-		if (node->config.logging.network_logging ())
-		{
+		//if (node->config.logging.network_logging ())
+		//{
 			if (!result)
 			{
-				node->logger.try_log (boost::str (boost::format ("Completed frontier request, %1% out of sync accounts according to %2%") % pulls.size () % connection_l->channel->to_string ()));
+				node->logger.always_log (boost::str (boost::format ("Completed frontier request, %1% out of sync accounts according to %2%") % pulls.size () % connection_l->channel->to_string ()));
 			}
 			else
 			{
 				node->stats.inc (nano::stat::type::error, nano::stat::detail::frontier_req, nano::stat::dir::out);
 			}
-		}
+		//}
 	}
 	return result;
 }

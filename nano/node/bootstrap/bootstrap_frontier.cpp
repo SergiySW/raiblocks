@@ -60,10 +60,10 @@ void nano::frontier_req_client::receive_frontier ()
 		}
 		else
 		{
-			if (this_l->connection->node->config.logging.network_message_logging ())
-			{
+			//if (this_l->connection->node->config.logging.network_message_logging ())
+			//{
 				this_l->connection->node->logger.try_log (boost::str (boost::format ("Invalid size: expected %1%, got %2%") % nano::frontier_req_client::size_frontier % size_a));
-			}
+			//}
 		}
 	});
 }
@@ -114,10 +114,10 @@ void nano::frontier_req_client::received_frontier (boost::system::error_code con
 			promise.set_value (true);
 			return;
 		}
-		if (connection->attempt->should_log ())
-		{
+		//if (connection->attempt->should_log ())
+		//{
 			connection->node->logger.always_log (boost::str (boost::format ("Received %1% frontiers from %2%") % std::to_string (count) % connection->channel->to_string ()));
-		}
+		//}
 		auto transaction (connection->node->store.tx_begin_read ());
 		if (!account.is_zero ())
 		{
@@ -179,10 +179,12 @@ void nano::frontier_req_client::received_frontier (boost::system::error_code con
 			{
 				try
 				{
+					connection->node->logger.always_log ("Finishing frontier request");
 					promise.set_value (false);
 				}
 				catch (std::future_error &)
 				{
+					connection->node->logger.always_log ("Error finishing frontier request");
 				}
 				connection->attempt->pool_connection (connection);
 			}
@@ -190,10 +192,10 @@ void nano::frontier_req_client::received_frontier (boost::system::error_code con
 	}
 	else
 	{
-		if (connection->node->config.logging.network_logging ())
-		{
+		//if (connection->node->config.logging.network_logging ())
+		//{
 			connection->node->logger.try_log (boost::str (boost::format ("Error while receiving frontier %1%") % ec.message ()));
-		}
+		//}
 	}
 }
 
