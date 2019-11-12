@@ -122,7 +122,8 @@ bool nano::bootstrap_attempt::request_frontier (nano::unique_lock<std::mutex> & 
 		lock_a.lock ();
 		if (result)
 		{
-			pulls.clear ();
+			decltype (pulls) pulls_empty;
+			pulls.swap (pulls_empty);
 		}
 		if (node->config.logging.network_logging ())
 		{
@@ -211,7 +212,8 @@ void nano::bootstrap_attempt::run_start (nano::unique_lock<std::mutex> & lock_a)
 	frontiers_confirmed = false;
 	total_blocks = 0;
 	requeued_pulls = 0;
-	pulls.clear ();
+	decltype (pulls) pulls_empty;
+	pulls.swap (pulls_empty);
 	recent_pulls_head.clear ();
 	auto frontier_failure (true);
 	uint64_t frontier_attempts (0);
@@ -241,6 +243,7 @@ void nano::bootstrap_attempt::run ()
 	run_start (lock);
 	while (still_pulling ())
 	{
+		unsigned iterations (0);
 		while (still_pulling ())
 		{
 			if (!pulls.empty ())
@@ -252,6 +255,12 @@ void nano::bootstrap_attempt::run ()
 				condition.wait (lock);
 			}
 			attempt_restart_check (lock);
+			// Attempt to cleanup memory used by bulk pulls container
+			++iterations;
+			if (iterations % 100000 == 0)
+			{
+				pulls.shrink_to_fit ();
+			}
 		}
 		// Flushing may resolve forks which can add more pulls
 		node->logger.try_log ("Flushing unchecked blocks");
@@ -293,7 +302,8 @@ void nano::bootstrap_attempt::run ()
 	}
 	stopped = true;
 	condition.notify_all ();
-	idle.clear ();
+	decltype (idle) idle_empty;
+	idle.swap (idle_empty);
 }
 
 std::shared_ptr<nano::bootstrap_client> nano::bootstrap_attempt::connection (nano::unique_lock<std::mutex> & lock_a, bool use_front_connection)
@@ -864,6 +874,7 @@ void nano::bootstrap_attempt::lazy_pull_flush ()
 			}
 			lazy_pulls.pop_front ();
 		}
+		lazy_pulls.shrink_to_fit ();
 	}
 }
 
@@ -921,13 +932,17 @@ bool nano::bootstrap_attempt::lazy_has_expired () const
 void nano::bootstrap_attempt::lazy_clear ()
 {
 	assert (!lazy_mutex.try_lock ());
-	lazy_blocks.clear ();
+	decltype (lazy_blocks) lazy_blocks_empty;
+	lazy_blocks.swap (lazy_blocks_empty);
 	lazy_blocks_count = 0;
 	lazy_keys.clear ();
-	lazy_pulls.clear ();
+	decltype (lazy_pulls) lazy_pulls_empty;
+	lazy_pulls.swap (lazy_pulls_empty);
 	lazy_state_backlog.clear ();
-	lazy_balances.clear ();
-	lazy_destinations.clear ();
+	decltype (lazy_balances) lazy_balances_empty;
+	lazy_balances.swap (lazy_balances_empty);
+	decltype (lazy_destinations) lazy_destinations_empty;
+	lazy_destinations.swap (lazy_destinations_empty);
 }
 
 void nano::bootstrap_attempt::lazy_run ()
@@ -987,7 +1002,8 @@ void nano::bootstrap_attempt::lazy_run ()
 		// Start wallet lazy bootstrap if required
 		if (!wallet_accounts.empty () && !node->flags.disable_wallet_bootstrap)
 		{
-			pulls.clear ();
+			decltype (pulls) pulls_empty;
+			pulls.swap (pulls_empty);
 			lazy_clear ();
 			mode = nano::bootstrap_mode::wallet_lazy;
 			lock.unlock ();
@@ -998,7 +1014,8 @@ void nano::bootstrap_attempt::lazy_run ()
 		// Fallback to legacy bootstrap
 		else if (runs_count < 3 && !lazy_keys.empty () && !node->flags.disable_legacy_bootstrap)
 		{
-			pulls.clear ();
+			decltype (pulls) pulls_empty;
+			pulls.swap (pulls_empty);
 			lazy_clear ();
 			mode = nano::bootstrap_mode::legacy;
 			lock.unlock ();
@@ -1009,7 +1026,8 @@ void nano::bootstrap_attempt::lazy_run ()
 	}
 	stopped = true;
 	condition.notify_all ();
-	idle.clear ();
+	decltype (idle) idle_empty;
+	idle.swap (idle_empty);
 }
 
 bool nano::bootstrap_attempt::process_block (std::shared_ptr<nano::block> block_a, nano::account const & known_account_a, uint64_t pull_blocks, nano::bulk_pull::count_t max_blocks, bool block_expected, unsigned retry_limit)
@@ -1320,7 +1338,8 @@ void nano::bootstrap_attempt::wallet_run ()
 	}
 	stopped = true;
 	condition.notify_all ();
-	idle.clear ();
+	decltype (idle) idle_empty;
+	idle.swap (idle_empty);
 }
 
 nano::bootstrap_initiator::bootstrap_initiator (nano::node & node_a) :

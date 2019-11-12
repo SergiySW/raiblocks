@@ -59,7 +59,10 @@ void nano::confirmation_height_processor::run ()
 			if (pending_writes.empty ())
 			{
 				// Separate blocks which are pending confirmation height can be batched by a minimum processing time (to improve disk write performance), so make sure the slate is clean when a new batch is starting.
-				confirmed_iterated_pairs.clear ();
+				decltype (confirmed_iterated_pairs) confirmed_iterated_pairs_empty;
+				confirmed_iterated_pairs.swap (confirmed_iterated_pairs_empty);
+				decltype (pending_writes) pending_writes_empty;
+				pending_writes.swap (pending_writes_empty);
 				timer.restart ();
 			}
 			add_confirmation_height (current_pending_block);
@@ -324,9 +327,11 @@ bool nano::confirmation_height_processor::write_pending (std::deque<conf_height_
 				{
 					logger.always_log ("Failed to write confirmation height for: ", pending.hash.to_string ());
 					ledger.stats.inc (nano::stat::type::confirmation_height, nano::stat::detail::invalid_block);
-					receive_source_pairs.clear ();
+					decltype (receive_source_pairs) receive_source_pairs_empty;
+					receive_source_pairs.swap (receive_source_pairs_empty);
 					receive_source_pairs_size = 0;
-					all_pending_a.clear ();
+					std::deque<conf_height_details> all_pending_empty;
+					all_pending_a.swap (all_pending_empty);
 					return true;
 				}
 
