@@ -3397,12 +3397,7 @@ TEST (node, dont_write_lock_node)
 	finished_promise.set_value ();
 }
 
-// Test is unstable on github actions for windows, disable if CI detected
-#if (defined(_WIN32) && CI)
-TEST (node, DISABLED_bidirectional_tcp)
-#else
 TEST (node, bidirectional_tcp)
-#endif
 {
 	nano::system system;
 	nano::node_flags node_flags;
