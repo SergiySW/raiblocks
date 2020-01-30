@@ -3465,6 +3465,11 @@ TEST (node, bidirectional_tcp)
 	}
 	// Test block confirmation from node 2
 	system.wallet (1)->insert_adhoc (nano::test_genesis_key.prv);
+	system.deadline_set (10s);
+	while (node1->rep_crawler.representative_count () == 0)
+	{
+		ASSERT_NO_ERROR (system.poll ());
+	}
 	confirmed = false;
 	system.deadline_set (20s);
 	while (!confirmed)
