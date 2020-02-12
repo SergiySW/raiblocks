@@ -47,6 +47,9 @@ public:
 	nano::vote_generator generator;
 	// Delay required for average network propagartion before requesting confirmation
 	static std::chrono::milliseconds constexpr confirmation_request_delay{ 1500 };
+	std::deque<nano::unchecked_info> blocks;
+	nano::condition_variable condition;
+	std::mutex mutex;
 
 private:
 	void queue_unchecked (nano::write_transaction const &, nano::block_hash const &);
@@ -59,14 +62,14 @@ private:
 	bool awaiting_write{ false };
 	std::chrono::steady_clock::time_point next_log;
 	std::deque<nano::unchecked_info> state_blocks;
-	std::deque<nano::unchecked_info> blocks;
+	//std::deque<nano::unchecked_info> blocks;
 	std::deque<std::shared_ptr<nano::block>> forced;
 	nano::block_hash filter_item (nano::block_hash const &, nano::signature const &);
 	std::unordered_set<nano::block_hash> blocks_filter;
-	nano::condition_variable condition;
+	//nano::condition_variable condition;
 	nano::node & node;
 	nano::write_database_queue & write_database_queue;
-	std::mutex mutex;
+	//std::mutex mutex;
 
 	friend std::unique_ptr<container_info_component> collect_container_info (block_processor & block_processor, const std::string & name);
 };
