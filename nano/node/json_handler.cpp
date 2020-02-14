@@ -4033,6 +4033,25 @@ void nano::json_handler::unchecked ()
 	if (!ec)
 	{
 		boost::property_tree::ptree unchecked;
+		// From cache
+		auto cached (node.store.unchecked_cache_list ());
+		for (auto i (cached.begin ()), n (cached.end ()); i != n && unchecked.size () < count; ++i)
+		{
+			nano::unchecked_info const & info (i->second);
+			if (json_block_l)
+			{
+				boost::property_tree::ptree block_node_l;
+				info.block->serialize_json (block_node_l);
+				unchecked.add_child (info.block->hash ().to_string (), block_node_l);
+			}
+			else
+			{
+				std::string contents;
+				info.block->serialize_json (contents);
+				unchecked.put (info.block->hash ().to_string (), contents);
+			}
+		}
+		// From disk
 		auto transaction (node.store.tx_begin_read ());
 		for (auto i (node.store.unchecked_begin (transaction)), n (node.store.unchecked_end ()); i != n && unchecked.size () < count; ++i)
 		{
@@ -4073,13 +4092,13 @@ void nano::json_handler::unchecked_get ()
 	auto hash (hash_impl ());
 	if (!ec)
 	{
-		auto transaction (node.store.tx_begin_read ());
-		for (auto i (node.store.unchecked_begin (transaction)), n (node.store.unchecked_end ()); i != n; ++i)
+		// Search in cache
+		for (auto const & i : node.store.unchecked_cache_list ())
 		{
-			nano::unchecked_key const & key (i->first);
+			nano::unchecked_key const & key (i.first);
 			if (key.hash == hash)
 			{
-				nano::unchecked_info const & info (i->second);
+				nano::unchecked_info const & info (i.second);
 				response_l.put ("modified_timestamp", std::to_string (info.modified));
 
 				if (json_block_l)
@@ -4095,6 +4114,34 @@ void nano::json_handler::unchecked_get ()
 					response_l.put ("contents", contents);
 				}
 				break;
+			}
+		}
+		// Search on disk
+		if (response_l.empty ())
+		{
+			auto transaction (node.store.tx_begin_read ());
+			for (auto i (node.store.unchecked_begin (transaction)), n (node.store.unchecked_end ()); i != n; ++i)
+			{
+				nano::unchecked_key const & key (i->first);
+				if (key.hash == hash)
+				{
+					nano::unchecked_info const & info (i->second);
+					response_l.put ("modified_timestamp", std::to_string (info.modified));
+
+					if (json_block_l)
+					{
+						boost::property_tree::ptree block_node_l;
+						info.block->serialize_json (block_node_l);
+						response_l.add_child ("contents", block_node_l);
+					}
+					else
+					{
+						std::string contents;
+						info.block->serialize_json (contents);
+						response_l.put ("contents", contents);
+					}
+					break;
+				}
 			}
 		}
 		if (response_l.empty ())

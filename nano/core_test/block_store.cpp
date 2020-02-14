@@ -488,7 +488,7 @@ TEST (block_store, one_bootstrap)
 	auto block1 (std::make_shared<nano::send_block> (0, 1, 2, nano::keypair ().prv, 4, 5));
 	auto transaction (store->tx_begin_write ());
 	store->unchecked_put (transaction, block1->hash (), block1);
-	store->flush (transaction);
+	store->unchecked_cache_flush (transaction);
 	auto begin (store->unchecked_begin (transaction));
 	auto end (store->unchecked_end ());
 	ASSERT_NE (end, begin);
@@ -1018,7 +1018,7 @@ TEST (mdb_block_store, upgrade_v6_v7)
 		modify_account_info_to_v13 (store, transaction, nano::genesis_account, nano::genesis_hash);
 		auto send1 (std::make_shared<nano::send_block> (0, 0, 0, nano::test_genesis_key.prv, nano::test_genesis_key.pub, 0));
 		store.unchecked_put (transaction, send1->hash (), send1);
-		store.flush (transaction);
+		store.unchecked_cache_flush (transaction);
 		ASSERT_NE (store.unchecked_end (), store.unchecked_begin (transaction));
 		store.confirmation_height_del (transaction, nano::genesis_account);
 	}
@@ -1043,7 +1043,7 @@ TEST (block_store, DISABLED_change_dupsort) // Unchecked is no longer dupsort ta
 	ASSERT_NE (send1->hash (), send2->hash ());
 	store.unchecked_put (transaction, send1->hash (), send1);
 	store.unchecked_put (transaction, send1->hash (), send2);
-	store.flush (transaction);
+	store.unchecked_cache_flush (transaction);
 	{
 		auto iterator1 (store.unchecked_begin (transaction));
 		++iterator1;
@@ -1054,7 +1054,7 @@ TEST (block_store, DISABLED_change_dupsort) // Unchecked is no longer dupsort ta
 	ASSERT_EQ (0, mdb_dbi_open (store.env.tx (transaction), "unchecked", MDB_CREATE | MDB_DUPSORT, &store.unchecked));
 	store.unchecked_put (transaction, send1->hash (), send1);
 	store.unchecked_put (transaction, send1->hash (), send2);
-	store.flush (transaction);
+	store.unchecked_cache_flush (transaction);
 	{
 		auto iterator1 (store.unchecked_begin (transaction));
 		++iterator1;
@@ -1064,7 +1064,7 @@ TEST (block_store, DISABLED_change_dupsort) // Unchecked is no longer dupsort ta
 	ASSERT_EQ (0, mdb_dbi_open (store.env.tx (transaction), "unchecked", MDB_CREATE | MDB_DUPSORT, &store.unchecked));
 	store.unchecked_put (transaction, send1->hash (), send1);
 	store.unchecked_put (transaction, send1->hash (), send2);
-	store.flush (transaction);
+	store.unchecked_cache_flush (transaction);
 	{
 		auto iterator1 (store.unchecked_begin (transaction));
 		++iterator1;
@@ -1093,7 +1093,7 @@ TEST (mdb_block_store, upgrade_v7_v8)
 	auto send2 (std::make_shared<nano::send_block> (1, 0, 0, nano::test_genesis_key.prv, nano::test_genesis_key.pub, 0));
 	store.unchecked_put (transaction, send1->hash (), send1);
 	store.unchecked_put (transaction, send1->hash (), send2);
-	store.flush (transaction);
+	store.unchecked_cache_flush (transaction);
 	{
 		auto iterator1 (store.unchecked_begin (transaction));
 		++iterator1;

@@ -108,7 +108,7 @@ public:
 	{
 		std::vector<nano::unchecked_info> result;
 		nano::unique_lock<std::mutex> lock (unchecked_cache_mutex);
-		for (auto & record : boost::make_iterator_range (unchecked_cache.template get<tag_hash> ().equal_range (hash_a)))
+		for (auto & record : boost::make_iterator_range (unchecked_cache.template get<tag_previous> ().equal_range (hash_a)))
 		{
 			result.push_back (record.info);
 		}
@@ -505,10 +505,11 @@ public:
 
 	void unchecked_put (nano::write_transaction const & transaction_a, nano::unchecked_key const & key_a, nano::unchecked_info const & info_a) override
 	{
-		nano::lock_guard<std::mutex> lock (unchecked_cache_mutex);
-		unchecked_cache.emplace (unchecked_item{ key_a, key_a.hash, info_a }); 
+		nano::unique_lock<std::mutex> lock (unchecked_cache_mutex);
+		unchecked_cache.emplace (unchecked_item{ key_a, key_a.previous, info_a }); 
 		if (unchecked_cache.size () >= unchecked_cache_max)
 		{
+			lock.unlock ();
 			unchecked_cache_flush (transaction_a);
 		}
 	}
@@ -528,7 +529,7 @@ public:
 
 	void unchecked_cache_flush (nano::write_transaction const & transaction_a) override
 	{
-		assert (!unchecked_cache_mutex.try_lock ());
+		nano::lock_guard<std::mutex> lock (unchecked_cache_mutex);
 		for (auto i (unchecked_cache.template get<tag_unchecked_key> ().begin ()), n (unchecked_cache.template get<tag_unchecked_key> ().end ()); i != n; ++i)
 		{
 			nano::db_val<Val> info (i->info);
@@ -630,6 +631,8 @@ public:
 	{
 		auto status = drop (transaction_a, tables::unchecked);
 		release_assert (success (status));
+		nano::unique_lock<std::mutex> lock (unchecked_cache_mutex);
+		unchecked_cache.clear (); 
 	}
 
 	size_t online_weight_count (nano::transaction const & transaction_a) const override
@@ -845,23 +848,23 @@ protected:
 	{
 	public:
 		nano::unchecked_key key;
-		nano::block_hash hash;
+		nano::block_hash previous;
 		nano::unchecked_info info;
 	};
 
 	// clang-format off
-	class tag_hash {};
+	class tag_previous {};
 	class tag_unchecked_key {};
 	boost::multi_index_container<unchecked_item,
 	mi::indexed_by<
 		mi::hashed_unique<mi::tag<tag_unchecked_key>,
 			mi::member<unchecked_item, nano::unchecked_key, &unchecked_item::key>>,
-		mi::hashed_non_unique<mi::tag<tag_hash>,
-			mi::member<unchecked_item, nano::block_hash, &unchecked_item::hash>>>>
+		mi::hashed_non_unique<mi::tag<tag_previous>,
+			mi::member<unchecked_item, nano::block_hash, &unchecked_item::previous>>>>
 	unchecked_cache;
 	// clang-format on
 
-	static size_t constexpr unchecked_cache_max{ 1024 };
+	static size_t constexpr unchecked_cache_max{ 512 };
 	static int constexpr version{ 18 };
 
 	template <typename T>

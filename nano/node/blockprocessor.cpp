@@ -22,6 +22,11 @@ write_database_queue (write_database_queue_a)
 nano::block_processor::~block_processor ()
 {
 	stop ();
+	if (node.flags.disable_unchecked_drop)
+	{
+		auto transaction (node.store.tx_begin_write ());
+		node.store.unchecked_cache_flush (transaction);
+	}
 }
 
 void nano::block_processor::stop ()
