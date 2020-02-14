@@ -711,15 +711,17 @@ int main (int argc, char * const * argv)
 			nano::network_params test_params;
 			nano::block_builder builder;
 			size_t num_accounts (100000);
-			size_t num_interations (5); // 100,000 * 5 * 2 = 1,000,000 blocks
-			size_t max_blocks (2 * num_accounts * num_interations + num_accounts * 2); //  1,000,000 + 2* 100,000 = 1,200,000 blocks
-			std::cerr << boost::str (boost::format ("Starting pregenerating %1% blocks\n") % max_blocks);
+			size_t num_iterations (5); // 100,000 * 5 * 2 = 1,000,000 blocks
+			size_t max_blocks (2 * num_accounts * num_iterations + num_accounts * 2); //  1,000,000 + 2 * 100,000 = 1,200,000 blocks
+			std::cout << boost::str (boost::format ("Starting pregenerating %1% blocks\n") % max_blocks);
 			nano::system system;
 			nano::work_pool work (std::numeric_limits<unsigned>::max ());
 			nano::logging logging;
-			auto path (nano::unique_path ());
+			auto path (data_path / boost::filesystem::unique_path ());
 			logging.init (path);
-			auto node (std::make_shared<nano::node> (system.io_ctx, 24001, path, system.alarm, logging, work));
+			auto node_flags = nano::node_flags ();
+			nano::update_flags (node_flags, vm);
+			auto node (std::make_shared<nano::node> (system.io_ctx, 24001, path, system.alarm, logging, work, node_flags));
 			nano::block_hash genesis_latest (node->latest (test_params.ledger.test_genesis_key.pub));
 			nano::uint128_t genesis_balance (std::numeric_limits<nano::uint128_t>::max ());
 			// Generating keys
@@ -758,7 +760,7 @@ int main (int argc, char * const * argv)
 				frontiers[i] = open->hash ();
 				blocks.push_back (std::move (open));
 			}
-			for (auto i (0); i != num_interations; ++i)
+			for (auto i (0); i != num_iterations; ++i)
 			{
 				for (auto j (0); j != num_accounts; ++j)
 				{
@@ -796,18 +798,34 @@ int main (int argc, char * const * argv)
 				}
 			}
 			// Processing blocks
-			std::cerr << boost::str (boost::format ("Starting processing %1% active blocks\n") % max_blocks);
+			std::cout << boost::str (boost::format ("Starting processing %1% blocks\n") % max_blocks);
 			auto begin (std::chrono::high_resolution_clock::now ());
 			while (!blocks.empty ())
 			{
 				auto block (blocks.front ());
-				node->process_active (block);
+				node->block_processor.add (block);
 				blocks.pop_front ();
 			}
+			size_t count (0);
+			while (node->ledger.cache.block_count != max_blocks + 1)
+			{
+				std::this_thread::sleep_for (std::chrono::milliseconds (10));
+				++count;
+				// Message each 15 seconds
+				if ((count % 1500) == 0)
+				{
+					std::cout << boost::str (boost::format ("%1% (%2%) blocks processed (unchecked)") % node->ledger.cache.block_count % node->ledger.cache.unchecked_count) << std::endl;
+				}
+			}
+			// Waiting for final transaction commit
 			uint64_t block_count (0);
+			{
+				auto transaction (node->store.tx_begin_read ());
+				block_count = node->store.block_count (transaction).sum ();
+			}
 			while (block_count < max_blocks + 1)
 			{
-				std::this_thread::sleep_for (std::chrono::milliseconds (100));
+				std::this_thread::sleep_for (std::chrono::milliseconds (10));
 				auto transaction (node->store.tx_begin_read ());
 				block_count = node->store.block_count (transaction).sum ();
 			}
@@ -824,8 +842,8 @@ int main (int argc, char * const * argv)
 			nano::network_params test_params;
 			nano::block_builder builder;
 			size_t num_accounts (100000);
-			size_t num_interations (10); // 100,000 * 5 * 2 = 2,000,000 blocks
-			size_t max_blocks (2 * num_accounts * num_interations + num_accounts * 2); //  1,000,000 + 10* 100,000 = 2,200,000 blocks
+			size_t num_interations (10); // 100,000 * 10 * 2 = 2,000,000 blocks
+			size_t max_blocks (2 * num_accounts * num_interations + num_accounts * 2); //  2,000,000 + 2 * 100,000 = 2,200,000 blocks
 			std::cerr << boost::str (boost::format ("Starting pregenerating %1% blocks\n") % max_blocks);
 			nano::system system;
 			nano::work_pool work (std::numeric_limits<unsigned>::max ());
