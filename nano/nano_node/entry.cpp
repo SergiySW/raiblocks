@@ -717,7 +717,7 @@ int main (int argc, char * const * argv)
 			nano::system system;
 			nano::work_pool work (std::numeric_limits<unsigned>::max ());
 			nano::logging logging;
-			auto path (data_path / boost::filesystem::unique_path ());
+			auto path (nano::unique_path ());
 			logging.init (path);
 			auto node_flags = nano::node_flags ();
 			nano::update_flags (node_flags, vm);
@@ -740,7 +740,7 @@ int main (int argc, char * const * argv)
 				            .representative (test_params.ledger.test_genesis_key.pub)
 				            .balance (genesis_balance)
 				            .link (keys[i].pub)
-				            .sign (keys[i].prv, keys[i].pub)
+				            .sign (test_params.ledger.test_genesis_key.prv, test_params.ledger.test_genesis_key.pub)
 				            .work (*work.generate (genesis_latest))
 				            .build ();
 
@@ -753,7 +753,7 @@ int main (int argc, char * const * argv)
 				            .representative (keys[i].pub)
 				            .balance (balances[i])
 				            .link (genesis_latest)
-				            .sign (test_params.ledger.test_genesis_key.prv, test_params.ledger.test_genesis_key.pub)
+				            .sign (keys[i].prv, keys[i].pub)
 				            .work (*work.generate (keys[i].pub))
 				            .build ();
 
@@ -803,7 +803,7 @@ int main (int argc, char * const * argv)
 			while (!blocks.empty ())
 			{
 				auto block (blocks.front ());
-				node->block_processor.add (block);
+				node->process_active (block);
 				blocks.pop_front ();
 			}
 			size_t count (0);
@@ -832,7 +832,7 @@ int main (int argc, char * const * argv)
 			auto end (std::chrono::high_resolution_clock::now ());
 			auto time (std::chrono::duration_cast<std::chrono::microseconds> (end - begin).count ());
 			node->stop ();
-			std::cerr << boost::str (boost::format ("%|1$ 12d| us \n%2% blocks per second\n") % time % (max_blocks * 1000000 / time));
+			std::cout << boost::str (boost::format ("%|1$ 12d| us \n%2% blocks per second\n") % time % (max_blocks * 1000000 / time));
 		}
 		else if (vm.count ("debug_profile_process_mod") || vm.count ("debug_profile_process_mod_reverse") || vm.count ("debug_profile_process_mod_change"))
 		{
@@ -842,9 +842,9 @@ int main (int argc, char * const * argv)
 			nano::network_params test_params;
 			nano::block_builder builder;
 			size_t num_accounts (100000);
-			size_t num_interations (10); // 100,000 * 10 * 2 = 2,000,000 blocks
-			size_t max_blocks (2 * num_accounts * num_interations + num_accounts * 2); //  2,000,000 + 2 * 100,000 = 2,200,000 blocks
-			std::cerr << boost::str (boost::format ("Starting pregenerating %1% blocks\n") % max_blocks);
+			size_t num_iterations (10); // 100,000 * 10 * 2 = 2,000,000 blocks
+			size_t max_blocks (2 * num_accounts * num_iterations + num_accounts * 2); //  2,000,000 + 2 * 100,000 = 2,200,000 blocks
+			std::cout << boost::str (boost::format ("Starting pregenerating %1% blocks\n") % max_blocks);
 			nano::system system;
 			nano::work_pool work (std::numeric_limits<unsigned>::max ());
 			nano::logging logging;
@@ -869,7 +869,7 @@ int main (int argc, char * const * argv)
 				            .representative (test_params.ledger.test_genesis_key.pub)
 				            .balance (genesis_balance)
 				            .link (keys[i].pub)
-				            .sign (keys[i].prv, keys[i].pub)
+				            .sign (test_params.ledger.test_genesis_key.prv, test_params.ledger.test_genesis_key.pub)
 				            .work (*work.generate (genesis_latest))
 				            .build ();
 
@@ -882,14 +882,14 @@ int main (int argc, char * const * argv)
 				            .representative (keys[i].pub)
 				            .balance (balances[i])
 				            .link (genesis_latest)
-				            .sign (test_params.ledger.test_genesis_key.prv, test_params.ledger.test_genesis_key.pub)
+				            .sign (keys[i].prv, keys[i].pub)
 				            .work (*work.generate (keys[i].pub))
 				            .build ();
 
 				frontiers[i] = open->hash ();
 				blocks.push_back (std::move (open));
 			}
-			for (auto i (0); i != num_interations; ++i)
+			for (auto i (0); i != num_iterations; ++i)
 			{
 				for (auto j (0); j != num_accounts && !change; ++j)
 				{
@@ -968,7 +968,7 @@ int main (int argc, char * const * argv)
 				}
 			}
 			// Processing blocks
-			std::cerr << boost::str (boost::format ("Starting processing %1% blocks\n") % max_blocks);
+			std::cout << boost::str (boost::format ("Starting processing %1% blocks\n") % max_blocks);
 			auto begin (std::chrono::high_resolution_clock::now ());
 			while (!blocks.empty ())
 			{
@@ -1002,7 +1002,7 @@ int main (int argc, char * const * argv)
 			auto end (std::chrono::high_resolution_clock::now ());
 			auto time (std::chrono::duration_cast<std::chrono::microseconds> (end - begin).count ());
 			node->stop ();
-			std::cerr << boost::str (boost::format ("%|1$ 12d| us \n%2% blocks per second\n") % time % (max_blocks * 1000000 / time));
+			std::cout << boost::str (boost::format ("%|1$ 12d| us \n%2% blocks per second\n") % time % (max_blocks * 1000000 / time));
 		}
 		else if (vm.count ("debug_profile_votes"))
 		{
