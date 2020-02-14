@@ -4,7 +4,15 @@
 #include <nano/secure/blockstore.hpp>
 #include <nano/secure/buffer.hpp>
 
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/member.hpp>
+#include <boost/multi_index/ordered_index.hpp>
+#include <boost/multi_index/sequenced_index.hpp>
+#include <boost/multi_index_container.hpp>
+
 #include <crypto/cryptopp/words.h>
+
+namespace mi = boost::multi_index;
 
 namespace nano
 {
@@ -22,6 +30,7 @@ public:
 	friend class nano::block_predecessor_set<Val, Derived_Store>;
 
 	std::mutex cache_mutex;
+	std::mutex unchecked_cache_mutex;
 
 	/**
 	 * If using a different store version than the latest then you may need
@@ -80,15 +89,30 @@ public:
 
 	bool unchecked_exists (nano::transaction const & transaction_a, nano::unchecked_key const & unchecked_key_a) override
 	{
-		nano::db_val<Val> value;
-		auto status (get (transaction_a, tables::unchecked, nano::db_val<Val> (unchecked_key_a), value));
-		release_assert (success (status) || not_found (status));
-		return (success (status));
+		nano::unique_lock<std::mutex> lock (unchecked_cache_mutex);
+		if (unchecked_cache.template get<tag_unchecked_key> ().find (unchecked_key_a) != unchecked_cache.template get<tag_unchecked_key> ().end ())
+		{
+			return true;
+		}
+		else
+		{
+			lock.unlock ();
+			nano::db_val<Val> value;
+			auto status (get (transaction_a, tables::unchecked, nano::db_val<Val> (unchecked_key_a), value));
+			release_assert (success (status) || not_found (status));
+			return (success (status));
+		}
 	}
 
 	std::vector<nano::unchecked_info> unchecked_get (nano::transaction const & transaction_a, nano::block_hash const & hash_a) override
 	{
 		std::vector<nano::unchecked_info> result;
+		nano::unique_lock<std::mutex> lock (unchecked_cache_mutex);
+		for (auto & record : boost::make_iterator_range (unchecked_cache.template get<tag_hash> ().equal_range (hash_a)))
+		{
+			result.push_back (record.info);
+		}
+		lock.unlock ();
 		for (auto i (unchecked_begin (transaction_a, nano::unchecked_key (hash_a, 0))), n (unchecked_end ()); i != n && i->first.key () == hash_a; ++i)
 		{
 			nano::unchecked_info const & unchecked_info (i->second);
@@ -481,16 +505,48 @@ public:
 
 	void unchecked_put (nano::write_transaction const & transaction_a, nano::unchecked_key const & key_a, nano::unchecked_info const & info_a) override
 	{
-		nano::db_val<Val> info (info_a);
-		auto status (put (transaction_a, tables::unchecked, key_a, info));
-		release_assert (success (status));
+		nano::lock_guard<std::mutex> lock (unchecked_cache_mutex);
+		unchecked_cache.emplace (unchecked_item{ key_a, key_a.hash, info_a }); 
+		if (unchecked_cache.size () >= unchecked_cache_max)
+		{
+			unchecked_cache_flush (transaction_a);
+		}
 	}
 
 	bool unchecked_del (nano::write_transaction const & transaction_a, nano::unchecked_key const & key_a) override
 	{
+		nano::unique_lock<std::mutex> lock (unchecked_cache_mutex);
+		if (unchecked_cache.template get<tag_unchecked_key> ().erase (key_a) > 0)
+		{
+			return false;
+		}
+		lock.unlock ();
 		auto status (del (transaction_a, tables::unchecked, key_a));
 		release_assert (success (status) || not_found (status));
 		return not_found (status);
+	}
+
+	void unchecked_cache_flush (nano::write_transaction const & transaction_a) override
+	{
+		assert (!unchecked_cache_mutex.try_lock ());
+		for (auto i (unchecked_cache.template get<tag_unchecked_key> ().begin ()), n (unchecked_cache.template get<tag_unchecked_key> ().end ()); i != n; ++i)
+		{
+			nano::db_val<Val> info (i->info);
+			auto status (put (transaction_a, tables::unchecked, i->key, info));
+			release_assert (success (status));
+		}
+		unchecked_cache.clear ();
+	}
+
+	std::vector<std::pair<nano::unchecked_key, nano::unchecked_info>> unchecked_cache_list () override
+	{
+		std::vector<std::pair<nano::unchecked_key, nano::unchecked_info>> result;
+		nano::lock_guard<std::mutex> lock (unchecked_cache_mutex);
+		for (auto i (unchecked_cache.template get<tag_unchecked_key> ().begin ()), n (unchecked_cache.template get<tag_unchecked_key> ().end ()); i != n; ++i)
+		{
+			result.emplace_back (i->key, i->info);
+		}
+		return result;
 	}
 
 	std::shared_ptr<nano::vote> vote_get (nano::transaction const & transaction_a, nano::account const & account_a) override
@@ -774,13 +830,38 @@ public:
 
 	size_t unchecked_count (nano::transaction const & transaction_a) override
 	{
-		return count (transaction_a, tables::unchecked);
+		nano::unique_lock<std::mutex> lock (unchecked_cache_mutex);
+		size_t cached_count (unchecked_cache.size ());
+		lock.unlock ();
+		return cached_count + count (transaction_a, tables::unchecked);
 	}
 
 protected:
 	nano::network_params network_params;
 	std::unordered_map<nano::account, std::shared_ptr<nano::vote>> vote_cache_l1;
 	std::unordered_map<nano::account, std::shared_ptr<nano::vote>> vote_cache_l2;
+
+	class unchecked_item final
+	{
+	public:
+		nano::unchecked_key key;
+		nano::block_hash hash;
+		nano::unchecked_info info;
+	};
+
+	// clang-format off
+	class tag_hash {};
+	class tag_unchecked_key {};
+	boost::multi_index_container<unchecked_item,
+	mi::indexed_by<
+		mi::hashed_unique<mi::tag<tag_unchecked_key>,
+			mi::member<unchecked_item, nano::unchecked_key, &unchecked_item::key>>,
+		mi::hashed_non_unique<mi::tag<tag_hash>,
+			mi::member<unchecked_item, nano::block_hash, &unchecked_item::hash>>>>
+	unchecked_cache;
+	// clang-format on
+
+	static size_t constexpr unchecked_cache_max{ 1024 };
 	static int constexpr version{ 18 };
 
 	template <typename T>

@@ -930,6 +930,16 @@ void nano::node::unchecked_cleanup ()
 	if (!flags.disable_unchecked_cleanup && ledger.cache.block_count >= ledger.bootstrap_weight_max_blocks && !long_attempt)
 	{
 		auto now (nano::seconds_since_epoch ());
+		// Cache check
+		for (auto const & i : store.unchecked_cache_list ())
+		{
+			nano::unchecked_key const & key (i.first);
+			nano::unchecked_info const & info (i.second);
+			if ((now - info.modified) > static_cast<uint64_t> (config.unchecked_cutoff_time.count ()))
+			{
+				cleaning_list.push_back (key);
+			}
+		}
 		auto transaction (store.tx_begin_read ());
 		// Max 1M records to clean, max 2 minutes reading to prevent slow i/o systems issues
 		for (auto i (store.unchecked_begin (transaction)), n (store.unchecked_end ()); i != n && cleaning_list.size () < 1024 * 1024 && nano::seconds_since_epoch () - now < 120; ++i)

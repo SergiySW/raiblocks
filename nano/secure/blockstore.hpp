@@ -753,6 +753,8 @@ public:
 	virtual nano::store_iterator<nano::unchecked_key, nano::unchecked_info> unchecked_begin (nano::transaction const &) const = 0;
 	virtual nano::store_iterator<nano::unchecked_key, nano::unchecked_info> unchecked_begin (nano::transaction const &, nano::unchecked_key const &) const = 0;
 	virtual nano::store_iterator<nano::unchecked_key, nano::unchecked_info> unchecked_end () const = 0;
+	virtual void unchecked_cache_flush (nano::write_transaction const &) = 0;
+	virtual std::vector<std::pair<nano::unchecked_key, nano::unchecked_info>> unchecked_cache_list () = 0;
 	virtual size_t unchecked_count (nano::transaction const &) = 0;
 
 	// Return latest vote for an account from store

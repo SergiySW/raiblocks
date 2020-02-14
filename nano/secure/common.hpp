@@ -494,3 +494,16 @@ public:
 
 nano::wallet_id random_wallet_id ();
 }
+
+namespace boost
+{
+template <>
+struct hash<::nano::unchecked_key>
+{
+	size_t operator() (::nano::unchecked_key const & value_a) const
+	{
+		::nano::uint512_union uint512_union (value_a.previous, value_a.hash);
+		return std::hash<::nano::uint512_union> () (uint512_union);
+	}
+};
+}
