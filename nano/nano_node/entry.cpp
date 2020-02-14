@@ -88,6 +88,9 @@ int main (int argc, char * const * argv)
 		("debug_profile_bootstrap", "Profile bootstrap style blocks processing (at least 10GB of free storage space required)")
 		("debug_profile_sign", "Profile signature generation")
 		("debug_profile_process", "Profile active blocks processing (only for nano_test_network)")
+		("debug_profile_process_mod", "Profile active blocks processing modification (only for nano_test_network)")
+		("debug_profile_process_mod_reverse", "Profile active blocks processing modification - reverse (only for nano_test_network)")
+		("debug_profile_process_mod_change", "Profile active blocks processing modification - change (only for nano_test_network)")
 		("debug_profile_votes", "Profile votes processing (only for nano_test_network)")
 		("debug_random_feed", "Generates output to RNG test suites")
 		("debug_rpc", "Read an RPC command from stdin and invoke it. Network operations will have no effect.")
@@ -711,7 +714,7 @@ int main (int argc, char * const * argv)
 			size_t num_interations (5); // 100,000 * 5 * 2 = 1,000,000 blocks
 			size_t max_blocks (2 * num_accounts * num_interations + num_accounts * 2); //  1,000,000 + 2* 100,000 = 1,200,000 blocks
 			std::cerr << boost::str (boost::format ("Starting pregenerating %1% blocks\n") % max_blocks);
-			nano::system system (1);
+			nano::system system;
 			nano::work_pool work (std::numeric_limits<unsigned>::max ());
 			nano::logging logging;
 			auto path (nano::unique_path ());
@@ -805,6 +808,176 @@ int main (int argc, char * const * argv)
 			while (block_count < max_blocks + 1)
 			{
 				std::this_thread::sleep_for (std::chrono::milliseconds (100));
+				auto transaction (node->store.tx_begin_read ());
+				block_count = node->store.block_count (transaction).sum ();
+			}
+			auto end (std::chrono::high_resolution_clock::now ());
+			auto time (std::chrono::duration_cast<std::chrono::microseconds> (end - begin).count ());
+			node->stop ();
+			std::cerr << boost::str (boost::format ("%|1$ 12d| us \n%2% blocks per second\n") % time % (max_blocks * 1000000 / time));
+		}
+		else if (vm.count ("debug_profile_process_mod") || vm.count ("debug_profile_process_mod_reverse") || vm.count ("debug_profile_process_mod_change"))
+		{
+			bool reverse (vm.count ("debug_profile_process_mod_reverse") > 0);
+			bool change (vm.count ("debug_profile_process_mod_change") > 0);
+			nano::network_constants::set_active_network (nano::nano_networks::nano_test_network);
+			nano::network_params test_params;
+			nano::block_builder builder;
+			size_t num_accounts (100000);
+			size_t num_interations (10); // 100,000 * 5 * 2 = 2,000,000 blocks
+			size_t max_blocks (2 * num_accounts * num_interations + num_accounts * 2); //  1,000,000 + 10* 100,000 = 2,200,000 blocks
+			std::cerr << boost::str (boost::format ("Starting pregenerating %1% blocks\n") % max_blocks);
+			nano::system system;
+			nano::work_pool work (std::numeric_limits<unsigned>::max ());
+			nano::logging logging;
+			auto path (data_path / boost::filesystem::unique_path ());
+			logging.init (path);
+			auto node (std::make_shared<nano::node> (system.io_ctx, 24001, path, system.alarm, logging, work));
+			nano::block_hash genesis_latest (node->latest (test_params.ledger.test_genesis_key.pub));
+			nano::uint128_t genesis_balance (std::numeric_limits<nano::uint128_t>::max ());
+			// Generating keys
+			std::vector<nano::keypair> keys (num_accounts);
+			std::vector<nano::root> frontiers (num_accounts);
+			std::vector<nano::uint128_t> balances (num_accounts, 1000000000);
+			// Generating blocks
+			std::deque<std::shared_ptr<nano::block>> blocks;
+			for (auto i (0); i != num_accounts; ++i)
+			{
+				genesis_balance = genesis_balance - 1000000000;
+
+				auto send = builder.state ()
+				            .account (test_params.ledger.test_genesis_key.pub)
+				            .previous (genesis_latest)
+				            .representative (test_params.ledger.test_genesis_key.pub)
+				            .balance (genesis_balance)
+				            .link (keys[i].pub)
+				            .sign (keys[i].prv, keys[i].pub)
+				            .work (*work.generate (genesis_latest))
+				            .build ();
+
+				genesis_latest = send->hash ();
+				blocks.push_back (std::move (send));
+
+				auto open = builder.state ()
+				            .account (keys[i].pub)
+				            .previous (0)
+				            .representative (keys[i].pub)
+				            .balance (balances[i])
+				            .link (genesis_latest)
+				            .sign (test_params.ledger.test_genesis_key.prv, test_params.ledger.test_genesis_key.pub)
+				            .work (*work.generate (keys[i].pub))
+				            .build ();
+
+				frontiers[i] = open->hash ();
+				blocks.push_back (std::move (open));
+			}
+			for (auto i (0); i != num_interations; ++i)
+			{
+				for (auto j (0); j != num_accounts && !change; ++j)
+				{
+					size_t other (num_accounts - j - 1);
+					// Sending to other account
+					--balances[j];
+
+					auto send = builder.state ()
+					            .account (keys[j].pub)
+					            .previous (frontiers[j])
+					            .representative (keys[j].pub)
+					            .balance (balances[j])
+					            .link (keys[other].pub)
+					            .sign (keys[j].prv, keys[j].pub)
+					            .work (*work.generate (frontiers[j]))
+					            .build ();
+
+					frontiers[j] = send->hash ();
+					// Receiving
+					++balances[other];
+
+					auto receive = builder.state ()
+					               .account (keys[other].pub)
+					               .previous (frontiers[other])
+					               .representative (keys[other].pub)
+					               .balance (balances[other])
+					               .link (static_cast<nano::block_hash const &> (frontiers[j]))
+					               .sign (keys[other].prv, keys[other].pub)
+					               .work (*work.generate (frontiers[other]))
+					               .build ();
+
+					frontiers[other] = receive->hash ();
+
+					if (!reverse)
+					{
+						blocks.push_back (std::move (send));
+						blocks.push_back (std::move (receive));
+					}
+					else
+					{
+						blocks.push_back (std::move (receive));
+						blocks.push_back (std::move (send));
+					}
+				}
+				// Change path
+				for (auto j (0); j != num_accounts && change; ++j)
+				{
+					size_t other (num_accounts - j - 1);
+
+					auto change_1 = builder.state ()
+					            .account (keys[j].pub)
+					            .previous (frontiers[j])
+					            .representative (keys[other].pub)
+					            .balance (balances[j])
+					            .link (0)
+					            .sign (keys[j].prv, keys[j].pub)
+					            .work (*work.generate (frontiers[j]))
+					            .build ();
+
+					frontiers[j] = change_1->hash ();
+
+					auto change_2 = builder.state ()
+					               .account (keys[other].pub)
+					               .previous (frontiers[other])
+					               .representative (keys[j].pub)
+					               .balance (balances[other])
+					               .link (0)
+					               .sign (keys[other].prv, keys[other].pub)
+					               .work (*work.generate (frontiers[other]))
+					               .build ();
+
+					frontiers[other] = change_2->hash ();
+
+					blocks.push_back (std::move (change_1));
+					blocks.push_back (std::move (change_2));
+				}
+			}
+			// Processing blocks
+			std::cerr << boost::str (boost::format ("Starting processing %1% blocks\n") % max_blocks);
+			auto begin (std::chrono::high_resolution_clock::now ());
+			while (!blocks.empty ())
+			{
+				auto block (blocks.front ());
+				nano::unchecked_info unchecked_info (block, block->account (), 0, nano::signature_verification::valid);
+				node->block_processor.add (unchecked_info);
+				blocks.pop_front ();
+			}
+			size_t count (0);
+			while (node->ledger.cache.block_count != max_blocks + 1)
+			{
+				std::this_thread::sleep_for (std::chrono::milliseconds (100));
+				if ((count % 300) == 0)
+				{
+					std::cout << boost::str (boost::format ("%1% (%2%) blocks processed (cache)") % node->ledger.cache.block_count % node->ledger.cache.unchecked_count) << std::endl;
+				}
+				count++;
+			}
+			// Waiting for final transaction commit
+			uint64_t block_count (0);
+			{
+				auto transaction (node->store.tx_begin_read ());
+				block_count = node->store.block_count (transaction).sum ();
+			}
+			while (block_count < max_blocks + 1)
+			{
+				std::this_thread::sleep_for (std::chrono::milliseconds (50));
 				auto transaction (node->store.tx_begin_read ());
 				block_count = node->store.block_count (transaction).sum ();
 			}
