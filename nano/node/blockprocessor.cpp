@@ -69,7 +69,7 @@ void nano::block_processor::add (std::shared_ptr<nano::block> block_a, uint64_t 
 
 void nano::block_processor::add (nano::unchecked_info const & info_a)
 {
-	if (!nano::work_validate (info_a.block->root (), info_a.block->block_work ()))
+	if (!nano::work_validate (nano::work_version::work_1, info_a.block->root (), info_a.block->block_work ()))
 	{
 		{
 			auto hash (info_a.block->hash ());
@@ -276,7 +276,7 @@ void nano::block_processor::process_batch (nano::unique_lock<std::mutex> & lock_
 	unsigned number_of_blocks_processed (0), number_of_forced_processed (0), processing_time (0);
 	{
 	auto scoped_write_guard = write_database_queue.wait (nano::writer::process_batch);
-	auto transaction (node.store.tx_begin_write ({ nano::tables::accounts, nano::tables::cached_counts, nano::tables::change_blocks, nano::tables::frontiers, nano::tables::open_blocks, nano::tables::pending, nano::tables::receive_blocks, nano::tables::representation, nano::tables::send_blocks, nano::tables::state_blocks, nano::tables::unchecked }, { nano::tables::confirmation_height }));
+	auto transaction (node.store.tx_begin_write ({ tables::accounts, nano::tables::cached_counts, nano::tables::change_blocks, tables::frontiers, tables::open_blocks, tables::pending, tables::receive_blocks, tables::representation, tables::send_blocks, tables::state_blocks, tables::unchecked }, { tables::confirmation_height }));
 	timer_l.restart ();
 	lock_a.lock ();
 	// Processing blocks
@@ -379,14 +379,14 @@ void nano::block_processor::process_live (nano::block_hash const & hash_a, std::
 	// Add to work watcher to prevent dropping the election
 	if (watch_work_a)
 	{
-		node.wallets.watcher->add (block_a);
+		node.wallets.watcher->add (block_a, nano::work_version::work_1);
 	}
 
 	// Start collecting quorum on block
 	node.active.insert (block_a, false);
 
 	// Announce block contents to the network
-	node.network.flood_block (block_a, false);
+	node.network.flood_block (block_a, nano::buffer_drop_policy::no_limiter_drop);
 	if (node.config.enable_voting && node.wallets.rep_counts ().voting > 0)
 	{
 		// Announce our weighted vote to the network
