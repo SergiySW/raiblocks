@@ -280,6 +280,7 @@ void nano::active_transactions::request_confirm (nano::unique_lock<std::mutex> &
 		}
 	}
 	auto const now (std::chrono::steady_clock::now ());
+	auto begin_request_confirm (std::chrono::high_resolution_clock::now ());
 	// Any new election started from process_live only gets requests after at least 1 second
 	auto cutoff_l (now - election_request_delay);
 	// Elections taking too long get escalated
@@ -346,6 +347,12 @@ void nano::active_transactions::request_confirm (nano::unique_lock<std::mutex> &
 		}
 	}
 	lock_a.unlock ();
+	auto end_request_confirm (std::chrono::high_resolution_clock::now ());
+	auto time_request_confirm (std::chrono::duration_cast<std::chrono::milliseconds> (end_request_confirm - begin_request_confirm).count ());
+	if (time_request_confirm > 20)
+	{
+		node.logger.always_log (boost::str (boost::format ("request_confirm %1% ms for %2% elections") % time_request_confirm % roots_size_l));
+	}
 	solicitor.flush ();
 	lock_a.lock ();
 	// Erase inactive elections
