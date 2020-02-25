@@ -1579,6 +1579,7 @@ int main (int argc, char * const * argv)
 				nano::lock_guard<std::mutex> lock (node2.node->block_processor.mutex); // Test
 				node2.node->block_processor.blocks.swap (blocks); // Test
 			}
+			node2.node->block_processor.condition.notify_all ();
 			nano::timer<std::chrono::seconds> timer_l (nano::timer_state::started);
 			while (node2.node->ledger.cache.block_count != block_count)
 			{
