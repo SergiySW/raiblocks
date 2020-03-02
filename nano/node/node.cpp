@@ -127,12 +127,12 @@ gap_cache (*this),
 ledger (store, stats, flags_a.generate_cache),
 checker (config.signature_checker_threads),
 network (*this, config.peering_port),
-telemetry (network, alarm, worker, flags.disable_ongoing_telemetry_requests),
+telemetry (std::make_shared<nano::telemetry> (network, alarm, worker, flags.disable_ongoing_telemetry_requests)),
 bootstrap_initiator (*this),
 bootstrap (config.peering_port, *this),
 application_path (application_path_a),
 port_mapping (*this),
-vote_processor (checker, active, observers, stats, config, logger, online_reps, ledger, network_params),
+vote_processor (checker, active, observers, stats, config, flags, logger, online_reps, ledger, network_params),
 rep_crawler (*this),
 warmed_up (0),
 block_processor (*this, write_database_queue),
@@ -154,6 +154,8 @@ startup_time (std::chrono::steady_clock::now ())
 {
 	if (!init_error ())
 	{
+		telemetry->start ();
+
 		if (config.websocket_config.enabled)
 		{
 			auto endpoint_l (nano::tcp_endpoint (boost::asio::ip::make_address_v6 (config.websocket_config.address), config.websocket_config.port));
@@ -548,29 +550,29 @@ void nano::node::process_fork (nano::transaction const & transaction_a, std::sha
 		if (ledger_block && !block_confirmed_or_being_confirmed (transaction_a, ledger_block->hash ()))
 		{
 			std::weak_ptr<nano::node> this_w (shared_from_this ());
-			if (active.insert (ledger_block, false, [this_w, root](std::shared_ptr<nano::block>) {
-				          if (auto this_l = this_w.lock ())
-				          {
-					          auto attempt (this_l->bootstrap_initiator.current_attempt ());
-					          if (attempt && attempt->mode == nano::bootstrap_mode::legacy)
-					          {
-						          auto transaction (this_l->store.tx_begin_read ());
-						          auto account (this_l->ledger.store.frontier_get (transaction, root));
-						          if (!account.is_zero ())
-						          {
-							          attempt->requeue_pull (nano::pull_info (account, root, root));
-						          }
-						          else if (this_l->ledger.store.account_exists (transaction, root))
-						          {
-							          attempt->requeue_pull (nano::pull_info (root, nano::block_hash (0), nano::block_hash (0)));
-						          }
-					          }
-				          }
-			          })
-			    .first)
+			auto election = active.insert (ledger_block, [this_w, root](std::shared_ptr<nano::block>) {
+				if (auto this_l = this_w.lock ())
+				{
+					auto attempt (this_l->bootstrap_initiator.current_attempt ());
+					if (attempt && attempt->mode == nano::bootstrap_mode::legacy)
+					{
+						auto transaction (this_l->store.tx_begin_read ());
+						auto account (this_l->ledger.store.frontier_get (transaction, root));
+						if (!account.is_zero ())
+						{
+							this_l->bootstrap_initiator.connections->requeue_pull (nano::pull_info (account, root, root, attempt->incremental_id));
+						}
+						else if (this_l->ledger.store.account_exists (transaction, root))
+						{
+							this_l->bootstrap_initiator.connections->requeue_pull (nano::pull_info (root, nano::block_hash (0), nano::block_hash (0), attempt->incremental_id));
+						}
+					}
+				}
+			});
+			if (election.second)
 			{
 				logger.always_log (boost::str (boost::format ("Resolving fork between our block: %1% and block %2% both with root %3%") % ledger_block->hash ().to_string () % block_a->hash ().to_string () % block_a->root ().to_string ()));
-				network.broadcast_confirm_req (ledger_block);
+				election.first->transition_active ();
 			}
 		}
 	}
@@ -587,7 +589,10 @@ std::unique_ptr<nano::container_info_component> nano::collect_container_info (no
 	composite->add_component (collect_container_info (node.bootstrap_initiator, "bootstrap_initiator"));
 	composite->add_component (collect_container_info (node.bootstrap, "bootstrap"));
 	composite->add_component (collect_container_info (node.network, "network"));
-	composite->add_component (collect_container_info (node.telemetry, "telemetry"));
+	if (node.telemetry)
+	{
+		composite->add_component (collect_container_info (*node.telemetry, "telemetry"));
+	}
 	composite->add_component (collect_container_info (node.observers, "observers"));
 	composite->add_component (collect_container_info (node.wallets, "wallets"));
 	composite->add_component (collect_container_info (node.vote_processor, "vote_processor"));
@@ -628,7 +633,7 @@ nano::process_return nano::node::process_local (std::shared_ptr<nano::block> blo
 	block_processor.wait_write ();
 	// Process block
 	auto transaction (store.tx_begin_write ({ tables::accounts, tables::cached_counts, tables::change_blocks, tables::frontiers, tables::open_blocks, tables::pending, tables::receive_blocks, tables::representation, tables::send_blocks, tables::state_blocks }, { tables::confirmation_height }));
-	return block_processor.process_one (transaction, info, work_watcher_a);
+	return block_processor.process_one (transaction, info, work_watcher_a, true);
 }
 
 void nano::node::start ()
@@ -700,7 +705,11 @@ void nano::node::stop ()
 		active.stop ();
 		confirmation_height_processor.stop ();
 		network.stop ();
-		telemetry.stop ();
+		if (telemetry)
+		{
+			telemetry->stop ();
+			telemetry = nullptr;
+		}
 		if (websocket_server)
 		{
 			websocket_server->stop ();
@@ -919,7 +928,10 @@ void nano::node::bootstrap_wallet ()
 			}
 		}
 	}
-	bootstrap_initiator.bootstrap_wallet (accounts);
+	if (!accounts.empty ())
+	{
+		bootstrap_initiator.bootstrap_wallet (accounts);
+	}
 }
 
 void nano::node::unchecked_cleanup ()
@@ -1007,14 +1019,14 @@ bool nano::node::work_generation_enabled (std::vector<std::pair<std::string, uin
 	return !peers_a.empty () || local_work_generation_enabled ();
 }
 
-boost::optional<uint64_t> nano::node::work_generate_blocking (nano::work_version const version_a, nano::block & block_a)
+boost::optional<uint64_t> nano::node::work_generate_blocking (nano::block & block_a)
 {
-	return work_generate_blocking (version_a, block_a, network_params.network.publish_threshold);
+	return work_generate_blocking (block_a, network_params.network.publish_threshold);
 }
 
-boost::optional<uint64_t> nano::node::work_generate_blocking (nano::work_version const version_a, nano::block & block_a, uint64_t difficulty_a)
+boost::optional<uint64_t> nano::node::work_generate_blocking (nano::block & block_a, uint64_t difficulty_a)
 {
-	auto opt_work_l (work_generate_blocking (version_a, block_a.root (), difficulty_a, block_a.account ()));
+	auto opt_work_l (work_generate_blocking (block_a.work_version (), block_a.root (), difficulty_a, block_a.account ()));
 	if (opt_work_l.is_initialized ())
 	{
 		block_a.block_work_set (*opt_work_l);
@@ -1051,18 +1063,6 @@ boost::optional<uint64_t> nano::node::work_generate_blocking (nano::work_version
 	},
 	difficulty_a, account_a);
 	return promise.get_future ().get ();
-}
-
-boost::optional<uint64_t> nano::node::work_generate_blocking (nano::block & block_a)
-{
-	debug_assert (network_params.network.is_test_network ());
-	return work_generate_blocking (block_a, network_params.network.publish_threshold);
-}
-
-boost::optional<uint64_t> nano::node::work_generate_blocking (nano::block & block_a, uint64_t difficulty_a)
-{
-	debug_assert (network_params.network.is_test_network ());
-	return work_generate_blocking (nano::work_version::work_1, block_a, difficulty_a);
 }
 
 boost::optional<uint64_t> nano::node::work_generate_blocking (nano::root const & root_a)
@@ -1102,8 +1102,11 @@ void nano::node::add_initial_peers ()
 
 void nano::node::block_confirm (std::shared_ptr<nano::block> block_a)
 {
-	active.insert (block_a, false);
-	network.broadcast_confirm_req (block_a);
+	auto election = active.insert (block_a);
+	if (election.second)
+	{
+		election.first->transition_active ();
+	}
 	// Calculate votes for local representatives
 	if (config.enable_voting && wallets.rep_counts ().voting > 0 && active.active (*block_a))
 	{
@@ -1256,26 +1259,31 @@ void nano::node::process_confirmed_data (nano::transaction const & transaction_a
 	}
 }
 
-void nano::node::process_confirmed (nano::election_status const & status_a, uint8_t iteration)
+void nano::node::process_confirmed (nano::election_status const & status_a, std::shared_ptr<nano::election> const & election_a, uint8_t iteration_a)
 {
 	if (status_a.type == nano::election_status_type::active_confirmed_quorum)
 	{
 		auto block_a (status_a.winner);
 		auto hash (block_a->hash ());
-		auto transaction (store.tx_begin_read ());
-		if (store.block_get (transaction, hash) != nullptr)
+		if (ledger.block_exists (block_a->type (), hash))
 		{
+			// Pausing to prevent this block being processed before adding to election winner details.
+			confirmation_height_processor.pause ();
 			confirmation_height_processor.add (hash);
+			{
+				active.add_election_winner_details (hash, election_a);
+			}
+			confirmation_height_processor.unpause ();
 		}
 		// Limit to 0.5 * 20 = 10 seconds (more than max block_processor::process_batch finish time)
-		else if (iteration < 20)
+		else if (iteration_a < 20)
 		{
-			iteration++;
+			iteration_a++;
 			std::weak_ptr<nano::node> node_w (shared ());
-			alarm.add (std::chrono::steady_clock::now () + network_params.node.process_confirmed_interval, [node_w, status_a, iteration]() {
+			alarm.add (std::chrono::steady_clock::now () + network_params.node.process_confirmed_interval, [node_w, status_a, iteration_a, election_a]() {
 				if (auto node_l = node_w.lock ())
 				{
-					node_l->process_confirmed (status_a, iteration);
+					node_l->process_confirmed (status_a, election_a, iteration_a);
 				}
 			});
 		}
@@ -1356,7 +1364,6 @@ peering_port (peering_port_a)
 		config_overrides_stream << entry << std::endl;
 	}
 	config_overrides_stream << std::endl;
-	// Make sure we don't create an empty toml file if it doesn't exist. Running without a toml file is the default.
 	nano::tomlconfig toml;
 	toml.read (config_overrides_stream);
 	auto error = config.deserialize_toml (toml);
