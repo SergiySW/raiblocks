@@ -12,7 +12,7 @@ class bootstrap_client;
 class frontier_req_client final : public std::enable_shared_from_this<nano::frontier_req_client>
 {
 public:
-	explicit frontier_req_client (std::shared_ptr<nano::bootstrap_client>, std::shared_ptr<nano::bootstrap_attempt>);
+	explicit frontier_req_client (std::shared_ptr<nano::bootstrap_client>, std::shared_ptr<nano::bootstrap_attempt>, unsigned const);
 	~frontier_req_client ();
 	void run ();
 	void receive_frontier ();
@@ -30,6 +30,7 @@ public:
 	std::promise<bool> promise;
 	/** A very rough estimate of the cost of `bulk_push`ing missing blocks */
 	uint64_t bulk_push_cost;
+	unsigned frontier_errors;
 	std::deque<std::pair<nano::account, nano::block_hash>> accounts;
 	static size_t constexpr size_frontier = sizeof (nano::account) + sizeof (nano::block_hash);
 };

@@ -500,6 +500,7 @@ bool nano::bootstrap_attempt_legacy::confirm_frontiers (nano::unique_lock<std::m
 bool nano::bootstrap_attempt_legacy::request_frontier (nano::unique_lock<std::mutex> & lock_a, bool first_attempt)
 {
 	auto result (true);
+	unsigned frontier_errors (0);
 	lock_a.unlock ();
 	auto connection_l (node->bootstrap_initiator.connections->connection (shared_from_this (), first_attempt));
 	lock_a.lock ();
@@ -509,7 +510,7 @@ bool nano::bootstrap_attempt_legacy::request_frontier (nano::unique_lock<std::mu
 		std::future<bool> future;
 		{
 			auto this_l (shared_from_this ());
-			auto client (std::make_shared<nano::frontier_req_client> (connection_l, this_l));
+			auto client (std::make_shared<nano::frontier_req_client> (connection_l, this_l, frontier_errors));
 			client->run ();
 			frontiers = client;
 			future = client->promise.get_future ();
@@ -554,6 +555,7 @@ bool nano::bootstrap_attempt_legacy::request_frontier (nano::unique_lock<std::mu
 			else
 			{
 				node->stats.inc (nano::stat::type::error, nano::stat::detail::frontier_req, nano::stat::dir::out);
+				++frontier_errors;
 			}
 		}
 	}

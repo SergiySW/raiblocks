@@ -8,6 +8,7 @@
 constexpr double nano::bootstrap_limits::bootstrap_connection_warmup_time_sec;
 constexpr double nano::bootstrap_limits::bootstrap_minimum_elapsed_seconds_blockrate;
 constexpr double nano::bootstrap_limits::bootstrap_minimum_frontier_blocks_per_sec;
+constexpr unsigned nano::bootstrap_limits::frontier_errors_limit;
 constexpr unsigned nano::bootstrap_limits::bulk_push_cost_limit;
 
 constexpr size_t nano::frontier_req_client::size_frontier;
@@ -36,12 +37,13 @@ void nano::frontier_req_client::run ()
 	nano::buffer_drop_policy::no_limiter_drop);
 }
 
-nano::frontier_req_client::frontier_req_client (std::shared_ptr<nano::bootstrap_client> connection_a, std::shared_ptr<nano::bootstrap_attempt> attempt_a) :
+nano::frontier_req_client::frontier_req_client (std::shared_ptr<nano::bootstrap_client> connection_a, std::shared_ptr<nano::bootstrap_attempt> attempt_a, unsigned const frontier_errors_a) :
 connection (connection_a),
 attempt (attempt_a),
 current (0),
 count (0),
-bulk_push_cost (0)
+bulk_push_cost (0),
+frontier_errors (frontier_errors_a)
 {
 	next ();
 }
@@ -113,6 +115,12 @@ void nano::frontier_req_client::received_frontier (boost::system::error_code con
 
 		double elapsed_sec = std::max (time_span.count (), nano::bootstrap_limits::bootstrap_minimum_elapsed_seconds_blockrate);
 		double blocks_per_sec = static_cast<double> (count) / elapsed_sec;
+		double minimum_blocks_per_sec = nano::bootstrap_limits::bootstrap_minimum_frontier_blocks_per_sec;
+		if (frontier_errors > nano::bootstrap_limits::frontier_errors_limit)
+		{
+			// For slow connections
+			minimum_blocks_per_sec = nano::bootstrap_limits::bootstrap_minimum_frontier_blocks_per_sec * nano::bootstrap_limits::frontier_errors_limit / frontier_errors;
+		}
 		if (elapsed_sec > nano::bootstrap_limits::bootstrap_connection_warmup_time_sec && blocks_per_sec < nano::bootstrap_limits::bootstrap_minimum_frontier_blocks_per_sec)
 		{
 			connection->node->logger.try_log (boost::str (boost::format ("Aborting frontier req because it was too slow")));
