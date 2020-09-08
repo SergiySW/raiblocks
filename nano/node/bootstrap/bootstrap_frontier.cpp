@@ -119,11 +119,11 @@ void nano::frontier_req_client::received_frontier (boost::system::error_code con
 		if (frontier_errors > nano::bootstrap_limits::frontier_errors_limit)
 		{
 			// For slow connections
-			minimum_blocks_per_sec = nano::bootstrap_limits::bootstrap_minimum_frontier_blocks_per_sec * nano::bootstrap_limits::frontier_errors_limit / frontier_errors;
+			minimum_blocks_per_sec = nano::bootstrap_limits::bootstrap_minimum_frontier_blocks_per_sec * std::pow (nano::bootstrap_limits::frontier_errors_limit, 1.5) / std::pow (frontier_errors, 1.5);
 		}
-		if (elapsed_sec > nano::bootstrap_limits::bootstrap_connection_warmup_time_sec && blocks_per_sec < nano::bootstrap_limits::bootstrap_minimum_frontier_blocks_per_sec)
+		if (elapsed_sec > nano::bootstrap_limits::bootstrap_connection_warmup_time_sec && blocks_per_sec < minimum_blocks_per_sec)
 		{
-			connection->node->logger.try_log (boost::str (boost::format ("Aborting frontier req because it was too slow")));
+			connection->node->logger.try_log (boost::str (boost::format ("Aborting frontier req because it was too slow, %1% blocks per second") % blocks_per_sec));
 			promise.set_value (true);
 			return;
 		}
