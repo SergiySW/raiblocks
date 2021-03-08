@@ -80,7 +80,9 @@ uint32_t nano::bootstrap_attempt_lazy::lazy_batch_size ()
 			double lazy_blocks_factor (std::pow (lazy_blocks_ratio / nano::bootstrap_limits::lazy_batch_pull_count_resize_ratio, 3.0));
 			// Decreasing total block count weight as less important (sqrt)
 			double total_blocks_factor (std::sqrt (total_blocks / nano::bootstrap_limits::lazy_batch_pull_count_resize_blocks_limit));
-			uint32_t batch_count_min (node->network_params.bootstrap.lazy_max_pull_blocks / static_cast<uint32_t> (lazy_blocks_factor * total_blocks_factor));
+			// Priority lazy bootstrap factor
+			double priority_factor (disallow_new_keys ? 2 : 1);
+			uint32_t batch_count_min (node->network_params.bootstrap.lazy_max_pull_blocks * priority_factor / static_cast<uint32_t> (lazy_blocks_factor * total_blocks_factor));
 			result = std::max (node->network_params.bootstrap.lazy_min_pull_blocks, batch_count_min);
 		}
 	}
