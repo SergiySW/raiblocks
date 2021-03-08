@@ -182,14 +182,15 @@ void nano::bootstrap_connections::connect_client (nano::tcp_endpoint const & end
 unsigned nano::bootstrap_connections::target_connections (size_t pulls_remaining, size_t attempts_count)
 {
 	auto const attempts_factor = nano::narrow_cast<unsigned> (node.config.bootstrap_connections * attempts_count);
-	if (attempts_factor >= node.config.bootstrap_connections_max)
+	auto const priority_factor = nano::narrow_cast<unsigned> (node.flags.priority_bootstrap ? 0 : node.config.bootstrap_connections * 2);
+	if (attempts_factor + priority_factor >= node.config.bootstrap_connections_max)
 	{
 		return std::max (1U, node.config.bootstrap_connections_max);
 	}
 
 	// Only scale up to bootstrap_connections_max for large pulls.
 	double step_scale = std::min (1.0, std::max (0.0, (double)pulls_remaining / nano::bootstrap_limits::bootstrap_connection_scale_target_blocks));
-	double target = (double)attempts_factor + (double)(node.config.bootstrap_connections_max - attempts_factor) * step_scale;
+	double target = (double)attempts_factor + (double)priority_factor + (double)(node.config.bootstrap_connections_max - attempts_factor - priority_factor) * step_scale;
 	return std::max (1U, (unsigned)(target + 0.5f));
 }
 
