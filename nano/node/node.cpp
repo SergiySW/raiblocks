@@ -968,7 +968,7 @@ void nano::node::bootstrap_lazy_priority ()
 		if (lazy_attempt == nullptr || !lazy_attempt->disallow_new_keys)
 		{
 			// Batch several keys
-			for (auto i (0); i < bootstrap_priority.size () && count < 512 * 1024; i++)
+			for (auto i (1); i <= bootstrap_priority.size () && count < 512 * 1024; i++)
 			{
 				auto const & [priority_hash, dependent_count] = bootstrap_priority[bootstrap_priority.size () - i];
 				count += dependent_count;
