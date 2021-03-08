@@ -103,6 +103,7 @@ int main (int argc, char * const * argv)
 		("debug_unconfirmed_frontiers", "Displays the account, height (sorted), frontier and cemented frontier for all accounts which are not fully confirmed")
 		("validate_blocks,debug_validate_blocks", "Check all blocks for correct hash, signature, work value")
 		("debug_prune", "Prune accounts up to last confirmed blocks (EXPERIMENTAL)")
+		("debug_bootstrap_priority", "Generate bootstrap priority file (EXPERIMENTAL, high RAM usage)")
 		("platform", boost::program_options::value<std::string> (), "Defines the <platform> for OpenCL commands")
 		("device", boost::program_options::value<std::string> (), "Defines <device> for OpenCL command")
 		("threads", boost::program_options::value<std::string> (), "Defines <threads> count for various commands")
@@ -1889,6 +1890,316 @@ int main (int argc, char * const * argv)
 			nano::inactive_node inactive_node (data_path, node_flags);
 			auto node = inactive_node.node;
 			node->ledger_pruning (node_flags.block_processor_batch_size != 0 ? node_flags.block_processor_batch_size : 16 * 1024, true, true);
+		}
+		else if (vm.count ("debug_bootstrap_priority"))
+		{
+			auto node_flags = nano::inactive_node_flag_defaults ();
+			nano::update_flags (node_flags, vm);
+			node_flags.generate_cache.block_count = true;
+			nano::inactive_node inactive_node (data_path, node_flags);
+			auto node = inactive_node.node;
+			class block_data final
+			{
+			public:
+				nano::block_hash previous;
+				nano::block_hash source;
+				//nano::account account;
+				size_t index;
+				uint8_t child_count;
+			};
+			boost::unordered_map<nano::block_hash, block_data> blocks;
+			std::vector<nano::block_hash> hashes;
+			//boost::unordered_set<nano::account> epoch_open_filter;
+			size_t count (0);
+
+			nano::genesis genesis;
+			auto genesis_hash (genesis.hash ());
+			auto time_point0 (std::chrono::high_resolution_clock::now ());
+			auto transaction (node->store.tx_begin_read ());
+
+			uint64_t block_count (node->ledger.cache.block_count);
+			std::cout << "Load blocks into memory...\n";
+			// Load all blocks into memory
+			for (auto i (node->store.blocks_begin (transaction)), n (node->store.blocks_end ()); i != n; ++i)
+			{
+				nano::block_hash hash (i->first);
+				nano::block_w_sideband block_with_sideband (i->second);
+				auto block (block_with_sideband.block);
+				release_assert (block != nullptr && block->hash () == hash);
+				nano::block_hash source (0);
+				if (block->type () == nano::block_type::open || block->type () == nano::block_type::receive)
+				{
+					source = (hash == genesis_hash) ? 0 : block->source ();
+				}
+				else if (block->type () == nano::block_type::state)
+				{
+					std::shared_ptr<nano::state_block> state (std::static_pointer_cast<nano::state_block> (block));
+					if (state != nullptr)
+					{
+						if (!state->hashables.link.is_zero () && !node->ledger.is_epoch_link (state->hashables.link) && !node->ledger.is_send (transaction, *state))
+						{
+							source = state->hashables.link.hash;
+						}
+						/*else if (node->ledger.is_epoch_link (state->hashables.link) && state->hashables.previous.is_zero ())
+						{
+							// Epoch open blocks (requires pending entry)
+							nano::account end (state->hashables.account.number () + 1);
+							for (auto i (node->store.pending_begin (transaction, nano::pending_key (state->hashables.account, 0))), n (node->store.pending_begin (transaction, nano::pending_key (end, 0))); i != n; ++i)
+							{
+								nano::pending_info const & info (i->second);
+								if (std::underlying_type_t<nano::epoch> (block->sideband ().details.epoch) > std::underlying_type_t<nano::epoch> (info.epoch))
+								{
+									nano::pending_key const & key (i->first);
+									source = key.hash;
+									break;
+								}
+							}
+						}*/
+					}
+				}
+				blocks.emplace (hash, block_data{ block->previous (), source, count, 0 });
+				hashes.push_back (hash);
+				++count;
+			}
+			release_assert (blocks.size () == block_count);
+			release_assert (blocks.size () == count);
+
+			auto time_point1 (std::chrono::high_resolution_clock::now ());
+			auto time1 (std::chrono::duration_cast<std::chrono::seconds> (time_point1 - time_point0).count ());
+			std::cout << boost::str (boost::format ("%1% blocks loaded in %2% seconds\n") % blocks.size () % time1);
+
+
+			std::cout << "Performing topological sorting...\n";
+			// Topological sorting
+			std::vector<size_t> previous;
+			std::vector<size_t> source;
+			previous.reserve (count);
+			source.reserve (count);
+			for (auto i (0); i != count; ++i)
+			{
+				auto existing (blocks.find (hashes[i]));
+				release_assert (existing != blocks.end ());
+				existing->second.previous.is_zero () ? previous.push_back (count) : previous.push_back (blocks.find (existing->second.previous)->second.index);
+				existing->second.source.is_zero () ? source.push_back (count) : source.push_back (blocks.find (existing->second.source)->second.index);
+			}
+			// Find levels
+			std::stack<size_t> DFS_stack;
+			std::vector<int> vertex_level (count, -1);
+			for (auto i (0); i != count; ++i)
+			{
+				if (vertex_level[i] == -1)
+				{
+					DFS_stack.push (i);
+					while (!DFS_stack.empty())
+					{
+						auto vertex (DFS_stack.top());
+						if (vertex_level[vertex] != -1)
+						{
+							DFS_stack.pop();
+							if (previous[vertex] < count && vertex_level[vertex] <= vertex_level[previous[vertex]])
+							{
+								vertex_level[vertex] = vertex_level[previous[vertex]] + 1;
+							}
+							if (source[vertex] < count && vertex_level[vertex] <= vertex_level[source[vertex]])
+							{
+								vertex_level[vertex] = vertex_level[source[vertex]] + 1;
+							}
+						}
+						else
+						{
+							if (previous[vertex] < count)
+							{
+								DFS_stack.push(previous[vertex]);
+							}
+							if (source[vertex] < count)
+							{
+								DFS_stack.push (source[vertex]);
+							}
+							vertex_level[vertex] = 0;
+						}
+					}
+				}
+			}
+			// Layers
+			size_t max_level (0);
+			std::vector<size_t> layer_sizes (count);
+			for (auto i (0); i != count; ++i)
+			{
+				layer_sizes[vertex_level[i]] += 1;
+				if (vertex_level[i] > max_level)
+				{
+					max_level = vertex_level[i];
+				}
+			}
+			std::vector<std::vector<size_t>> layers (max_level + 1);
+			for (auto level (0); level != max_level + 1; ++level)
+			{
+				layers[level].reserve (layer_sizes[level]);
+			}
+			for (auto i (0); i != count; ++i)
+			{
+				layers[vertex_level[i]].push_back (i);
+			}
+			auto level_zero_size (layers[0].size ());
+			auto time_point2 (std::chrono::high_resolution_clock::now ());
+			auto time2 (std::chrono::duration_cast<std::chrono::seconds> (time_point2 - time_point1).count ());
+			std::cout << boost::str (boost::format ("%1% layers sorting finished in %2% seconds, layer zero size: %3% \n") % max_level % time2 % level_zero_size);
+			// Cleanup
+			std::stack<size_t> empty_stack;
+			DFS_stack.swap (empty_stack);
+			vertex_level.clear ();
+			source.clear ();
+			previous.clear ();
+			layer_sizes.clear ();
+
+
+			/*std::cout << "Performing sorting validation...\n";
+			count = 0;
+			for (auto level (0); level != max_level + 1; ++level)
+			{
+				for (auto & index : layers[level])
+				{
+					++count;
+					auto existing (blocks.find (hashes[index]));
+					release_assert (existing != blocks.end ());
+					// Replace index with level for checks
+					existing->second.index = level;
+				}
+			}
+			release_assert (blocks.size () == count);
+			for (auto level (0); level != max_level + 1; ++level)
+			{
+				for (auto & index : layers[level])
+				{
+					auto existing (blocks.find (hashes[index]));
+					if (!existing->second.source.is_zero ())
+					{
+						auto existing_source (blocks.find (existing->second.source));
+						release_assert (level > existing_source->second.index);
+						++existing_source->second.child_count;
+					}
+					if (!existing->second.previous.is_zero ())
+					{
+						auto existing_previous (blocks.find (existing->second.previous));
+						release_assert (level > existing_previous->second.index);
+						++existing_previous->second.child_count;
+					}
+				}
+			}*/
+			auto time_point3 (std::chrono::high_resolution_clock::now ());
+			auto time3 (std::chrono::duration_cast<std::chrono::seconds> (time_point3 - time_point2).count ());
+			std::cout << boost::str (boost::format ("Validated in %1% seconds\n") % time3);
+
+
+			std::cout << "Performing blocks ordering...\n";
+			std::vector<size_t> ordered_blocks;
+			ordered_blocks.reserve (block_count);
+			for (auto level (0); level != max_level + 1; ++level)
+			{
+				for (auto & index : layers[level])
+				{
+					ordered_blocks.push_back (index);
+					auto existing (blocks.find (hashes[index]));
+					release_assert (existing != blocks.end ());
+					// Replace index with sequential number
+					existing->second.index = ordered_blocks.size () - 1;
+				}
+			}
+			auto time_point4 (std::chrono::high_resolution_clock::now ());
+			auto time4 (std::chrono::duration_cast<std::chrono::seconds> (time_point4 - time_point3).count ());
+			std::cout << boost::str (boost::format ("Ordered in single vector in %1% seconds\n") % time4);
+			// Cleanup
+			layers.clear ();
+
+
+			size_t max_block_count (512 * 1024);
+			size_t min_block_count (32 * 1024);
+			uint32_t target_block_index (level_zero_size - 1);
+			size_t max_index (block_count - 1);
+			auto iteration (0);
+			auto max_iteration (block_count * 128 / min_block_count);
+			bool overflow (false);
+			std::vector<nano::block_hash> target_blocks;
+			std::cout << "Search for priority bootstrap blocks...\n";
+			while (iteration < max_iteration && target_block_index < max_index)
+			{
+				++iteration;
+				if (!overflow)
+				{
+					target_block_index += nano::random_pool::generate_word32 (static_cast<CryptoPP::word32> (min_block_count), static_cast<CryptoPP::word32> (max_block_count));
+				}
+				else
+				{
+					overflow = false;
+				}
+				if (target_block_index > max_index)
+				{
+					target_block_index = target_block_index % max_index;
+				}
+				auto hash (hashes[ordered_blocks[target_block_index]]);
+				if (blocks.find (hash) != blocks.end ())
+				{
+					boost::unordered_set<nano::block_hash> checked_blocks;
+					std::vector<size_t> checked_indexes;
+					std::deque<nano::block_hash> to_check;
+					to_check.push_back (hash);
+					//while (!to_check.empty () && checked_blocks.size () <= max_block_count)
+					while (!to_check.empty ())
+					{
+						auto check_hash = to_check.front ();
+						to_check.pop_front ();
+						auto existing (blocks.find (check_hash));
+						if (existing != blocks.end () && checked_blocks.find (check_hash) == checked_blocks.end ())
+						{
+							checked_blocks.insert (check_hash);
+							checked_indexes.push_back (existing->second.index);
+							if (!existing->second.previous.is_zero ())
+							{
+								to_check.push_back (existing->second.previous);
+							}
+							if (!existing->second.source.is_zero ())
+							{
+								to_check.push_back (existing->second.source);
+							}
+						}
+					}
+					if (checked_blocks.size () <= max_block_count && (checked_blocks.size () >= min_block_count || target_block_index == max_index))
+					{
+						target_blocks.push_back (hash);
+						for (auto const & erase_hash : checked_blocks)
+						{
+							blocks.erase (blocks.find (erase_hash));
+						}
+						double coverage_block_count (block_count - blocks.size ());
+						double coverage_percent (coverage_block_count * 100 / (double)block_count);
+						std::cout << boost::str (boost::format ("%1% : %2% : %3% : %4%/%5% : %6% percent\n") % hash.to_string () % target_block_index % checked_blocks.size () % iteration % max_iteration % coverage_percent);
+					}
+					// Else too many blocks or too low block count per target hash, skip this hash
+					else if (checked_blocks.size () > max_block_count)
+					{
+						overflow = true;
+						target_block_index = checked_indexes[checked_blocks.size () - max_block_count];
+					}
+				}
+			}
+			double coverage_block_count (block_count - blocks.size ());
+			double coverage_percent (coverage_block_count * 100 / (double)block_count);
+			auto time_point5 (std::chrono::high_resolution_clock::now ());
+			auto time5 (std::chrono::duration_cast<std::chrono::seconds> (time_point5 - time_point4).count ());
+			std::cout << boost::str (boost::format ("Found %1% percent ledger coverage in %2% seconds\n") % coverage_percent % time5);
+
+			std::cout << "Write results to file...\n";
+			uint64_t block_count_priority (target_blocks.size ());
+			std::string network (node->network_params.network.is_live_network () ? "live": node->network_params.network.is_beta_network () ? "beta" : "undefined");
+			std::ofstream binary;
+			binary.open ("bootstrap_priority_" + network + ".bin", std::ofstream::out | std::ofstream::binary);
+			binary.write (reinterpret_cast<const char *> (&block_count_priority), sizeof (block_count_priority));
+			binary.write (reinterpret_cast<const char *> (&target_blocks[0]), target_blocks.size() * sizeof (nano::block_hash));
+			binary.close ();
+
+			auto time_point6 (std::chrono::high_resolution_clock::now ());
+			auto time6 (std::chrono::duration_cast<std::chrono::seconds> (time_point6 - time_point0).count ());
+			std::cout << boost::str (boost::format ("\nFinished in %1% seconds total. %2% blocks are prioritized for lazy bootstrap\n") % time6 % target_blocks.size ());
 		}
 		else if (vm.count ("debug_stacktrace"))
 		{
