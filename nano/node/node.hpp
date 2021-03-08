@@ -122,6 +122,7 @@ public:
 	void backup_wallet ();
 	void search_pending ();
 	void bootstrap_wallet ();
+	void bootstrap_lazy_priority (std::deque<nano::block_hash> const & bootstrap_priority_list_a);
 	void unchecked_cleanup ();
 	bool collect_ledger_pruning_targets (std::deque<nano::block_hash> &, nano::account &, uint64_t const, uint64_t const, uint64_t const);
 	void ledger_pruning (uint64_t const, bool, bool);
@@ -149,7 +150,7 @@ public:
 	bool init_error () const;
 	bool epoch_upgrader (nano::raw_key const &, nano::epoch, uint64_t, uint64_t);
 	std::pair<uint64_t, decltype (nano::ledger::bootstrap_weights)> get_bootstrap_weights () const;
-	std::vector<nano::block_hash> get_bootstrap_priority () const;
+	std::deque<nano::block_hash> get_bootstrap_priority () const;
 	nano::write_database_queue write_database_queue;
 	boost::asio::io_context & io_ctx;
 	boost::latch node_initialized_latch;

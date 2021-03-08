@@ -845,24 +845,39 @@ void nano::node::ongoing_rep_calculation ()
 
 void nano::node::ongoing_bootstrap ()
 {
-	auto next_wakeup (network_params.node.bootstrap_interval);
-	if (warmed_up < 3)
+	auto bootstrap_weight_reached (ledger.cache.block_count >= ledger.bootstrap_weight_max_blocks);
+	if (bootstrap_weight_reached)
 	{
-		// Re-attempt bootstrapping more aggressively on startup
-		next_wakeup = std::chrono::seconds (5);
-		if (!bootstrap_initiator.in_progress () && !network.empty ())
+		auto next_wakeup (network_params.node.bootstrap_interval);
+		if (warmed_up < 3)
 		{
-			++warmed_up;
+			// Re-attempt bootstrapping more aggressively on startup
+			next_wakeup = std::chrono::seconds (5);
+			if (!bootstrap_initiator.in_progress () && !network.empty ())
+			{
+				++warmed_up;
+			}
 		}
+		bootstrap_initiator.bootstrap ();
+		std::weak_ptr<nano::node> node_w (shared_from_this ());
+		workers.add_timed_task (std::chrono::steady_clock::now () + next_wakeup, [node_w]() {
+			if (auto node_l = node_w.lock ())
+			{
+				node_l->ongoing_bootstrap ();
+			}
+		});
 	}
-	bootstrap_initiator.bootstrap ();
-	std::weak_ptr<nano::node> node_w (shared_from_this ());
-	workers.add_timed_task (std::chrono::steady_clock::now () + next_wakeup, [node_w]() {
-		if (auto node_l = node_w.lock ())
-		{
-			node_l->ongoing_bootstrap ();
-		}
-	});
+	else if (!flags.disable_lazy_bootstrap)
+	{
+		auto bootstrap_priority_list (get_bootstrap_priority ());
+		std::weak_ptr<nano::node> node_w (shared_from_this ());
+		workers.add_timed_task (std::chrono::steady_clock::now (), [node_w, bootstrap_priority_list]() {
+			if (auto node_l = node_w.lock ())
+			{
+				node_l->bootstrap_lazy_priority (bootstrap_priority_list);
+			}
+		});
+	}
 }
 
 void nano::node::ongoing_peer_store ()
@@ -928,6 +943,44 @@ void nano::node::bootstrap_wallet ()
 	if (!accounts.empty ())
 	{
 		bootstrap_initiator.bootstrap_wallet (accounts);
+	}
+}
+
+void nano::node::bootstrap_lazy_priority (std::deque<nano::block_hash> const & bootstrap_priority_list_a)
+{
+	auto bootstrap_priority_list_l (bootstrap_priority_list_a);
+	while (!bootstrap_priority_list_l.empty ())
+	{
+		auto priority_hash = bootstrap_priority_list_l.front ();
+		if (ledger.block_exists (priority_hash))
+		{
+			bootstrap_priority_list_l.pop_front ();
+		}
+		else
+		{
+			break;
+		}
+	}
+	if (!bootstrap_priority_list_l.empty ())
+	{
+		if (bootstrap_initiator.current_lazy_attempt () == nullptr)
+		{
+			auto priority_hash = bootstrap_priority_list_l.front ();
+			bootstrap_initiator.bootstrap_lazy (priority_hash, true /* forced */, true /* unconfirmed, but marked */, priority_hash.to_string (), true /* single block bootstrap */ );
+		}
+
+		auto next_wakeup (std::chrono::seconds (15));
+		std::weak_ptr<nano::node> node_w (shared_from_this ());
+		workers.add_timed_task (std::chrono::steady_clock::now () + next_wakeup, [node_w, bootstrap_priority_list_l]() {
+			if (auto node_l = node_w.lock ())
+			{
+				node_l->bootstrap_lazy_priority (bootstrap_priority_list_l);
+			}
+		});
+	}
+	else
+	{
+		ongoing_bootstrap ();
 	}
 }
 
@@ -1738,17 +1791,16 @@ std::pair<uint64_t, decltype (nano::ledger::bootstrap_weights)> nano::node::get_
 	return { max_blocks, weights };
 }
 
-std::vector<nano::block_hash> nano::node::get_bootstrap_priority () const
+std::deque<nano::block_hash> nano::node::get_bootstrap_priority () const
 {
 	// Bootstrap priority
-	std::vector<nano::block_hash> priority_blocks;
+	std::deque<nano::block_hash> priority_blocks;
 	const uint8_t * priority_buffer = network_params.network.is_live_network () ? nano_bootstrap_priority_live : nano_bootstrap_priority_beta;
 	size_t priority_buffer_size = network_params.network.is_live_network () ? nano_bootstrap_priority_live_size : nano_bootstrap_priority_beta_size;
 	nano::bufferstream priority_stream ((const uint8_t *)priority_buffer, priority_buffer_size);
 	uint64_t blocks;
 	if (!nano::try_read (priority_stream, blocks))
 	{
-		priority_blocks.reserve (blocks);
 		while (priority_blocks.size () < blocks)
 		{
 			nano::block_hash hash;
