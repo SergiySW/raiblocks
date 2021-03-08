@@ -973,7 +973,7 @@ void nano::node::bootstrap_lazy_priority ()
 			{
 				auto const & [priority_hash, dependent_count] = bootstrap_priority[bootstrap_priority.size () - i];
 				count += dependent_count;
-				bootstrap_initiator.bootstrap_lazy (priority_hash, i == 0 /* forced for first */, true /* unconfirmed, but marked */, priority_hash.to_string (), true /* batch priority bootstrap */);
+				bootstrap_initiator.bootstrap_lazy (priority_hash, i == 1 /* forced for first */, true /* unconfirmed, but marked */, priority_hash.to_string (), true /* batch priority bootstrap */);
 			}
 		}
 
