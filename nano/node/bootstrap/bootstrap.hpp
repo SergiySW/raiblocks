@@ -138,6 +138,6 @@ public:
 	static constexpr unsigned lazy_destinations_request_limit = 256 * 1024;
 	static constexpr uint64_t lazy_batch_pull_count_resize_blocks_limit = 4 * 1024 * 1024;
 	static constexpr double lazy_batch_pull_count_resize_ratio = 2.0;
-	static constexpr size_t lazy_blocks_restart_limit = 1024 * 1024;
+	static constexpr size_t lazy_blocks_restart_limit = 2 * 1024 * 1024;
 };
 }
