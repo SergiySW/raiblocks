@@ -182,7 +182,7 @@ void nano::bootstrap_connections::connect_client (nano::tcp_endpoint const & end
 unsigned nano::bootstrap_connections::target_connections (size_t pulls_remaining, size_t attempts_count)
 {
 	auto const attempts_factor = nano::narrow_cast<unsigned> (node.config.bootstrap_connections * attempts_count);
-	auto const priority_factor = nano::narrow_cast<unsigned> (node.flags.priority_bootstrap ? 0 : node.config.bootstrap_connections * 2);
+	auto const priority_factor = nano::narrow_cast<unsigned> (node.flags.priority_bootstrap ? node.config.bootstrap_connections * 2 : 0);
 	if (attempts_factor + priority_factor >= node.config.bootstrap_connections_max)
 	{
 		return std::max (1U, node.config.bootstrap_connections_max);
