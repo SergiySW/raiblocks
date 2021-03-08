@@ -352,7 +352,7 @@ void nano::bootstrap_attempt_lazy::lazy_block_state (std::shared_ptr<nano::block
 			// Insert in backlog state blocks if previous wasn't already processed
 			else
 			{
-				lazy_state_backlog.emplace (previous, nano::lazy_state_backlog_item{ link, balance, retry_limit });
+				lazy_state_backlog.emplace (previous, nano::lazy_state_backlog_item{ link, balance, retry_limit, false });
 			}
 		}
 	}
@@ -417,7 +417,11 @@ void nano::bootstrap_attempt_lazy::lazy_backlog_cleanup ()
 		}
 		else
 		{
-			lazy_add (it->first, it->second.retry_limit);
+			if (!it->second.processed)
+			{
+				lazy_add (it->first, it->second.retry_limit);
+				it->second.processed = true;
+			}
 			++it;
 		}
 		// We don't want to open read transactions for too long

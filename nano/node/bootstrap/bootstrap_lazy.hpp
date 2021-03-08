@@ -22,6 +22,7 @@ public:
 	nano::link link{ 0 };
 	nano::uint128_t balance{ 0 };
 	unsigned retry_limit{ 0 };
+	bool processed{ false };
 };
 class lazy_destinations_item final
 {
