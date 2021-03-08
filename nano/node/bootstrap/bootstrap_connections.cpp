@@ -411,6 +411,12 @@ void nano::bootstrap_connections::requeue_pull (nano::pull_info const & pull_a, 
 			debug_assert (pull.account_or_head == pull.head);
 			if (!attempt_l->lazy_processed_or_exists (pull.account_or_head.as_block_hash ()))
 			{
+				if (pull.processed >= node.network_params.bootstrap.lazy_max_pull_blocks)
+				{
+					nano::lock_guard<nano::mutex> lock (mutex);
+					pulls.push_front (pull);
+				}
+				else
 				{
 					nano::lock_guard<nano::mutex> lock (mutex);
 					pulls.push_back (pull);
