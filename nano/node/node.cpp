@@ -848,7 +848,8 @@ void nano::node::ongoing_rep_calculation ()
 void nano::node::ongoing_bootstrap ()
 {
 	auto bootstrap_weight_reached (ledger.cache.block_count >= ledger.bootstrap_weight_max_blocks);
-	if (bootstrap_weight_reached && (flags.disable_lazy_bootstrap || bootstrap_priority.empty ()))
+	auto priority_bootstrap (bootstrap_weight_reached && flags.priority_bootstrap && !flags.disable_lazy_bootstrap && !bootstrap_priority.empty ());
+	if (!priority_bootstrap)
 	{
 		auto next_wakeup (network_params.node.bootstrap_interval);
 		if (warmed_up < 3)
@@ -869,7 +870,7 @@ void nano::node::ongoing_bootstrap ()
 			}
 		});
 	}
-	else if (!flags.disable_lazy_bootstrap)
+	else
 	{
 		std::weak_ptr<nano::node> node_w (shared_from_this ());
 		workers.add_timed_task (std::chrono::steady_clock::now (), [node_w]() {
@@ -981,7 +982,6 @@ void nano::node::bootstrap_lazy_priority ()
 		workers.add_timed_task (std::chrono::steady_clock::now () + next_wakeup, [node_w]() {
 			if (auto node_l = node_w.lock ())
 			{
-				node_l->block_processor.flush ();
 				node_l->bootstrap_lazy_priority ();
 			}
 		});

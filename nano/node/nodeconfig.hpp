@@ -145,6 +145,7 @@ public:
 	bool disable_search_pending{ false }; // For testing only
 	bool enable_pruning{ false };
 	bool fast_bootstrap{ false };
+	bool priority_bootstrap{ false };
 	bool read_only{ false };
 	nano::confirmation_height_mode confirmation_height_processor_mode{ nano::confirmation_height_mode::automatic };
 	nano::generate_cache generate_cache;
