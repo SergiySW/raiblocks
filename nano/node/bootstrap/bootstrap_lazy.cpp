@@ -26,21 +26,17 @@ nano::bootstrap_attempt_lazy::~bootstrap_attempt_lazy ()
 	node->bootstrap_initiator.notify_listeners (false);
 }
 
-void nano::bootstrap_attempt_lazy::lazy_start (nano::hash_or_account const & hash_or_account_a, bool confirmed, bool disallow_new_keys_a)
+void nano::bootstrap_attempt_lazy::lazy_start (nano::hash_or_account const & hash_or_account_a, bool confirmed)
 {
-	if (!disallow_new_keys)
+	nano::unique_lock<nano::mutex> lock (mutex);
+	// Add start blocks, limit 1024 (4k with disabled legacy bootstrap)
+	size_t max_keys (node->flags.disable_legacy_bootstrap ? 4 * 1024 : 1024);
+	if (lazy_keys.size () < max_keys && lazy_keys.find (hash_or_account_a.as_block_hash ()) == lazy_keys.end () && !lazy_blocks_processed (hash_or_account_a.as_block_hash ()))
 	{
-		disallow_new_keys = disallow_new_keys_a;
-		nano::unique_lock<nano::mutex> lock (mutex);
-		// Add start blocks, limit 1024 (4k with disabled legacy bootstrap)
-		size_t max_keys (node->flags.disable_legacy_bootstrap ? 4 * 1024 : 1024);
-		if (lazy_keys.size () < max_keys && lazy_keys.find (hash_or_account_a.as_block_hash ()) == lazy_keys.end () && !lazy_blocks_processed (hash_or_account_a.as_block_hash ()))
-		{
-			lazy_keys.insert (hash_or_account_a.as_block_hash ());
-			lazy_pulls.emplace_back (hash_or_account_a, confirmed ? lazy_retry_limit_confirmed () : node->network_params.bootstrap.lazy_retry_limit);
-			lock.unlock ();
-			condition.notify_all ();
-		}
+		lazy_keys.insert (hash_or_account_a.as_block_hash ());
+		lazy_pulls.emplace_back (hash_or_account_a, confirmed ? lazy_retry_limit_confirmed () : node->network_params.bootstrap.lazy_retry_limit);
+		lock.unlock ();
+		condition.notify_all ();
 	}
 }
 

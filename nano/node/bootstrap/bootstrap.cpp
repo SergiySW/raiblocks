@@ -99,12 +99,14 @@ void nano::bootstrap_initiator::bootstrap_lazy (nano::hash_or_account const & ha
 			lazy_attempt = std::make_shared<nano::bootstrap_attempt_lazy> (node.shared (), attempts.incremental++, id_a.empty () ? hash_or_account_a.to_string () : id_a);
 			attempts_list.push_back (lazy_attempt);
 			attempts.add (lazy_attempt);
-			lazy_attempt->lazy_start (hash_or_account_a, confirmed, disallow_new_keys);
+			lazy_attempt->lazy_start (hash_or_account_a, confirmed);
+			lazy_attempt->disallow_new_keys = disallow_new_keys;
 		}
 	}
-	else
+	else if (!lazy_attempt->disallow_new_keys || disallow_new_keys)
 	{
 		lazy_attempt->lazy_start (hash_or_account_a, confirmed);
+		lazy_attempt->disallow_new_keys = disallow_new_keys;
 	}
 	condition.notify_all ();
 }

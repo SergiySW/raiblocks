@@ -2119,7 +2119,7 @@ int main (int argc, char * const * argv)
 			auto iteration (0);
 			auto max_iteration (block_count * 128 / min_block_count);
 			bool overflow (false);
-			std::vector<nano::block_hash> target_blocks;
+			std::vector<std::pair<nano::block_hash, nano::amount>> target_blocks;
 			std::cout << "Search for priority bootstrap blocks...\n";
 			while (iteration < max_iteration && target_block_index < max_index)
 			{
@@ -2165,7 +2165,7 @@ int main (int argc, char * const * argv)
 					}
 					if (checked_blocks.size () <= max_block_count && (checked_blocks.size () >= min_block_count || target_block_index == max_index))
 					{
-						target_blocks.push_back (hash);
+						target_blocks.emplace_back (hash, checked_blocks.size ());
 						for (auto const & erase_hash : checked_blocks)
 						{
 							blocks.erase (blocks.find (erase_hash));
@@ -2189,12 +2189,12 @@ int main (int argc, char * const * argv)
 			std::cout << boost::str (boost::format ("Found %1% percent ledger coverage in %2% seconds\n") % coverage_percent % time5);
 
 			std::cout << "Write results to file...\n";
-			uint64_t block_count_priority (target_blocks.size ());
+			nano::amount block_count_priority (target_blocks.size ());
 			std::string network (node->network_params.network.is_live_network () ? "live": node->network_params.network.is_beta_network () ? "beta" : "undefined");
 			std::ofstream binary;
 			binary.open ("bootstrap_priority_" + network + ".bin", std::ofstream::out | std::ofstream::binary);
 			binary.write (reinterpret_cast<const char *> (&block_count_priority), sizeof (block_count_priority));
-			binary.write (reinterpret_cast<const char *> (&target_blocks[0]), target_blocks.size() * sizeof (nano::block_hash));
+			binary.write (reinterpret_cast<const char *> (&target_blocks[0]), target_blocks.size () * (sizeof (nano::block_hash) + sizeof (nano::amount)));
 			binary.close ();
 
 			auto time_point6 (std::chrono::high_resolution_clock::now ());

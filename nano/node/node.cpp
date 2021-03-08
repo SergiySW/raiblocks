@@ -951,10 +951,10 @@ void nano::node::bootstrap_lazy_priority ()
 {
 	while (!bootstrap_priority.empty ())
 	{
-		auto priority_hash = bootstrap_priority.front ();
+		auto [priority_hash, dependent_count] = bootstrap_priority.back ();
 		if (ledger.block_exists (priority_hash))
 		{
-			bootstrap_priority.pop_front ();
+			bootstrap_priority.pop_back ();
 		}
 		else
 		{
@@ -963,10 +963,17 @@ void nano::node::bootstrap_lazy_priority ()
 	}
 	if (!bootstrap_priority.empty ())
 	{
-		if (bootstrap_initiator.current_lazy_attempt () == nullptr)
+		auto count (0);
+		auto lazy_attempt (bootstrap_initiator.current_lazy_attempt ());
+		if (lazy_attempt == nullptr || !lazy_attempt->disallow_new_keys)
 		{
-			auto priority_hash = bootstrap_priority.front ();
-			bootstrap_initiator.bootstrap_lazy (priority_hash, true /* forced */, true /* unconfirmed, but marked */, priority_hash.to_string (), true /* single block bootstrap */ );
+			// Batch several keys
+			for (auto i (0); i < bootstrap_priority.size () && count < 512 * 1024; i++)
+			{
+				auto const & [priority_hash, dependent_count] = bootstrap_priority[bootstrap_priority.size () - i];
+				count += dependent_count;
+				bootstrap_initiator.bootstrap_lazy (priority_hash, i == 0 /* forced for first */, true /* unconfirmed, but marked */, priority_hash.to_string (), true /* batch priority bootstrap */);
+			}
 		}
 
 		auto next_wakeup (std::chrono::seconds (15));
@@ -974,6 +981,7 @@ void nano::node::bootstrap_lazy_priority ()
 		workers.add_timed_task (std::chrono::steady_clock::now () + next_wakeup, [node_w]() {
 			if (auto node_l = node_w.lock ())
 			{
+				node_l->block_processor.flush ();
 				node_l->bootstrap_lazy_priority ();
 			}
 		});
@@ -1791,16 +1799,18 @@ std::pair<uint64_t, decltype (nano::ledger::bootstrap_weights)> nano::node::get_
 	return { max_blocks, weights };
 }
 
-std::deque<nano::block_hash> nano::node::get_bootstrap_priority () const
+std::vector<std::pair<nano::block_hash, uint64_t>> nano::node::get_bootstrap_priority () const
 {
 	// Bootstrap priority
-	std::deque<nano::block_hash> priority_blocks;
+	std::vector<std::pair<nano::block_hash, uint64_t>> priority_blocks;
 	const uint8_t * priority_buffer = network_params.network.is_live_network () ? nano_bootstrap_priority_live : nano_bootstrap_priority_beta;
 	size_t priority_buffer_size = network_params.network.is_live_network () ? nano_bootstrap_priority_live_size : nano_bootstrap_priority_beta_size;
 	nano::bufferstream priority_stream ((const uint8_t *)priority_buffer, priority_buffer_size);
 	uint64_t blocks;
-	if (!nano::try_read (priority_stream, blocks))
+	nano::amount blocks_uint128;
+	if (!nano::try_read (priority_stream, blocks_uint128))
 	{
+		blocks = nano::narrow_cast<uint64_t> (blocks_uint128.number ());
 		while (priority_blocks.size () < blocks)
 		{
 			nano::block_hash hash;
@@ -1808,9 +1818,16 @@ std::deque<nano::block_hash> nano::node::get_bootstrap_priority () const
 			{
 				break;
 			}
-			priority_blocks.push_back (hash);
+			nano::amount dependent_blocks_uint128;
+			if (nano::try_read (priority_stream, dependent_blocks_uint128))
+			{
+				break;
+			}
+			priority_blocks.emplace_back (hash, nano::narrow_cast<uint64_t> (dependent_blocks_uint128.number ()));
 		}
 	}
+	// Reverse for easier blcoks removing from back
+	std::reverse (priority_blocks.begin (), priority_blocks.end ());
 	return priority_blocks;
 }
 

@@ -150,8 +150,8 @@ public:
 	bool init_error () const;
 	bool epoch_upgrader (nano::raw_key const &, nano::epoch, uint64_t, uint64_t);
 	std::pair<uint64_t, decltype (nano::ledger::bootstrap_weights)> get_bootstrap_weights () const;
-	std::deque<nano::block_hash> get_bootstrap_priority () const;
-	std::deque<nano::block_hash> bootstrap_priority;
+	std::vector<std::pair<nano::block_hash, uint64_t>> get_bootstrap_priority () const;
+	std::vector<std::pair<nano::block_hash, uint64_t>> bootstrap_priority;
 	nano::write_database_queue write_database_queue;
 	boost::asio::io_context & io_ctx;
 	boost::latch node_initialized_latch;
