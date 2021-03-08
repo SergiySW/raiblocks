@@ -418,6 +418,8 @@ node_seq (seq)
 			}
 			ledger.bootstrap_weight_max_blocks = bootstrap_weights.first;
 
+			bootstrap_priority = get_bootstrap_priority ();
+
 			// Drop unchecked blocks if initial bootstrap is completed
 			if (!flags.disable_unchecked_drop && !use_bootstrap_weight && !flags.read_only)
 			{
@@ -846,7 +848,7 @@ void nano::node::ongoing_rep_calculation ()
 void nano::node::ongoing_bootstrap ()
 {
 	auto bootstrap_weight_reached (ledger.cache.block_count >= ledger.bootstrap_weight_max_blocks);
-	if (bootstrap_weight_reached)
+	if (bootstrap_weight_reached && (flags.disable_lazy_bootstrap || bootstrap_priority.empty ()))
 	{
 		auto next_wakeup (network_params.node.bootstrap_interval);
 		if (warmed_up < 3)
@@ -869,12 +871,11 @@ void nano::node::ongoing_bootstrap ()
 	}
 	else if (!flags.disable_lazy_bootstrap)
 	{
-		auto bootstrap_priority_list (get_bootstrap_priority ());
 		std::weak_ptr<nano::node> node_w (shared_from_this ());
-		workers.add_timed_task (std::chrono::steady_clock::now (), [node_w, bootstrap_priority_list]() {
+		workers.add_timed_task (std::chrono::steady_clock::now (), [node_w]() {
 			if (auto node_l = node_w.lock ())
 			{
-				node_l->bootstrap_lazy_priority (bootstrap_priority_list);
+				node_l->bootstrap_lazy_priority ();
 			}
 		});
 	}
@@ -946,35 +947,34 @@ void nano::node::bootstrap_wallet ()
 	}
 }
 
-void nano::node::bootstrap_lazy_priority (std::deque<nano::block_hash> const & bootstrap_priority_list_a)
+void nano::node::bootstrap_lazy_priority ()
 {
-	auto bootstrap_priority_list_l (bootstrap_priority_list_a);
-	while (!bootstrap_priority_list_l.empty ())
+	while (!bootstrap_priority.empty ())
 	{
-		auto priority_hash = bootstrap_priority_list_l.front ();
+		auto priority_hash = bootstrap_priority.front ();
 		if (ledger.block_exists (priority_hash))
 		{
-			bootstrap_priority_list_l.pop_front ();
+			bootstrap_priority.pop_front ();
 		}
 		else
 		{
 			break;
 		}
 	}
-	if (!bootstrap_priority_list_l.empty ())
+	if (!bootstrap_priority.empty ())
 	{
 		if (bootstrap_initiator.current_lazy_attempt () == nullptr)
 		{
-			auto priority_hash = bootstrap_priority_list_l.front ();
+			auto priority_hash = bootstrap_priority.front ();
 			bootstrap_initiator.bootstrap_lazy (priority_hash, true /* forced */, true /* unconfirmed, but marked */, priority_hash.to_string (), true /* single block bootstrap */ );
 		}
 
 		auto next_wakeup (std::chrono::seconds (15));
 		std::weak_ptr<nano::node> node_w (shared_from_this ());
-		workers.add_timed_task (std::chrono::steady_clock::now () + next_wakeup, [node_w, bootstrap_priority_list_l]() {
+		workers.add_timed_task (std::chrono::steady_clock::now () + next_wakeup, [node_w]() {
 			if (auto node_l = node_w.lock ())
 			{
-				node_l->bootstrap_lazy_priority (bootstrap_priority_list_l);
+				node_l->bootstrap_lazy_priority ();
 			}
 		});
 	}
