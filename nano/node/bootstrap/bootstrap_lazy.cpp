@@ -226,6 +226,10 @@ void nano::bootstrap_attempt_lazy::run ()
 	}
 	lock.unlock ();
 	stop ();
+	if (disallow_new_keys)
+	{
+		node->block_processor.flush ();
+	}
 	condition.notify_all ();
 }
 
