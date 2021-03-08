@@ -34,7 +34,7 @@ void nano::bootstrap_attempt_lazy::lazy_start (nano::hash_or_account const & has
 	if (lazy_keys.size () < max_keys && lazy_keys.find (hash_or_account_a.as_block_hash ()) == lazy_keys.end () && !lazy_blocks_processed (hash_or_account_a.as_block_hash ()))
 	{
 		lazy_keys.insert (hash_or_account_a.as_block_hash ());
-		lazy_pulls.emplace_back (hash_or_account_a, confirmed ? lazy_retry_limit_confirmed () : node->network_params.bootstrap.lazy_retry_limit);
+		lazy_pulls.emplace_back (hash_or_account_a, confirmed ? lazy_retry_limit_confirmed () : !disallow_new_keys ? node->network_params.bootstrap.lazy_retry_limit : node->network_params.bootstrap.frontier_retry_limit);
 		lock.unlock ();
 		condition.notify_all ();
 	}
@@ -380,7 +380,7 @@ void nano::bootstrap_attempt_lazy::lazy_block_state_backlog_check (std::shared_p
 		// Assumption for other legacy block types
 		else if (lazy_undefined_links.find (next_block.link.as_block_hash ()) == lazy_undefined_links.end ())
 		{
-			lazy_add (next_block.link, node->network_params.bootstrap.lazy_retry_limit); // Head is not confirmed. It can be account or hash or non-existing
+			lazy_add (next_block.link, !disallow_new_keys ? node->network_params.bootstrap.lazy_retry_limit : node->network_params.bootstrap.frontier_retry_limit); // Head is not confirmed. It can be account or hash or non-existing
 			lazy_undefined_links.insert (next_block.link.as_block_hash ());
 		}
 		lazy_state_backlog.erase (find_state);
