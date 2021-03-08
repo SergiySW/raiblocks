@@ -848,7 +848,7 @@ void nano::node::ongoing_rep_calculation ()
 void nano::node::ongoing_bootstrap ()
 {
 	auto bootstrap_weight_reached (ledger.cache.block_count >= ledger.bootstrap_weight_max_blocks);
-	auto priority_bootstrap (bootstrap_weight_reached && flags.priority_bootstrap && !flags.disable_lazy_bootstrap && !bootstrap_priority.empty ());
+	auto priority_bootstrap (!bootstrap_weight_reached && flags.priority_bootstrap && !flags.disable_lazy_bootstrap && !bootstrap_priority.empty ());
 	if (!priority_bootstrap)
 	{
 		auto next_wakeup (network_params.node.bootstrap_interval);
