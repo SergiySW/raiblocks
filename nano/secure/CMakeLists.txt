@@ -34,11 +34,35 @@ file(
   "	size_t nano_bootstrap_weights_beta_size = sizeof(nano_bootstrap_weights_beta) - 1;\n"
   "}\n")
 
+# Embed bootstrap priority accounts
+if (EXISTS ${CMAKE_SOURCE_DIR}/bootstrap_priority_live.bin)
+  file(READ ${CMAKE_SOURCE_DIR}/bootstrap_priority_live.bin priority_live HEX)
+  string(REGEX REPLACE "(..)" "0x\\1," priority_live ${priority_live})
+endif ()
+file (WRITE ${CMAKE_BINARY_DIR}/bootstrap_priority_live.cpp "#include <cstddef>\n"
+  "namespace nano {\n"
+  "	unsigned char nano_bootstrap_priority_live[] = {${priority_live} 0x00};\n"
+  "	size_t nano_bootstrap_priority_live_size = sizeof(nano_bootstrap_priority_live) - 1;\n"
+  "}\n")
+
+if (EXISTS ${CMAKE_SOURCE_DIR}/bootstrap_priority_beta.bin)
+  file(READ ${CMAKE_SOURCE_DIR}/bootstrap_priority_beta.bin priority_beta HEX)
+  string(REGEX REPLACE "(..)" "0x\\1," priority_beta ${priority_beta})
+endif ()
+file (WRITE ${CMAKE_BINARY_DIR}/bootstrap_priority_beta.cpp "#include <cstddef>\n"
+  "namespace nano {\n"
+  "	unsigned char nano_bootstrap_priority_beta[] = {${priority_beta} 0x00};\n"
+  "	size_t nano_bootstrap_priority_beta_size = sizeof(nano_bootstrap_priority_beta) - 1;\n"
+  "}\n")
+
+
 add_library(
   secure
   ${PLATFORM_SECURE_SOURCE}
   ${CMAKE_BINARY_DIR}/bootstrap_weights_live.cpp
   ${CMAKE_BINARY_DIR}/bootstrap_weights_beta.cpp
+  ${CMAKE_BINARY_DIR}/bootstrap_priority_live.cpp
+  ${CMAKE_BINARY_DIR}/bootstrap_priority_beta.cpp
   blockstore.hpp
   blockstore.cpp
   blockstore_partial.hpp

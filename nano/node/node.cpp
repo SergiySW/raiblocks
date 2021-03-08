@@ -30,6 +30,10 @@ extern unsigned char nano_bootstrap_weights_live[];
 extern size_t nano_bootstrap_weights_live_size;
 extern unsigned char nano_bootstrap_weights_beta[];
 extern size_t nano_bootstrap_weights_beta_size;
+extern unsigned char nano_bootstrap_priority_live[];
+extern size_t nano_bootstrap_priority_live_size;
+extern unsigned char nano_bootstrap_priority_beta[];
+extern size_t nano_bootstrap_priority_beta_size;
 }
 
 void nano::node::keepalive (std::string const & address_a, uint16_t port_a)
@@ -1732,6 +1736,30 @@ std::pair<uint64_t, decltype (nano::ledger::bootstrap_weights)> nano::node::get_
 		}
 	}
 	return { max_blocks, weights };
+}
+
+std::vector<nano::block_hash> nano::node::get_bootstrap_priority () const
+{
+	// Bootstrap priority
+	std::vector<nano::block_hash> priority_blocks;
+	const uint8_t * priority_buffer = network_params.network.is_live_network () ? nano_bootstrap_priority_live : nano_bootstrap_priority_beta;
+	size_t priority_buffer_size = network_params.network.is_live_network () ? nano_bootstrap_priority_live_size : nano_bootstrap_priority_beta_size;
+	nano::bufferstream priority_stream ((const uint8_t *)priority_buffer, priority_buffer_size);
+	uint64_t blocks;
+	if (!nano::try_read (priority_stream, blocks))
+	{
+		priority_blocks.reserve (blocks);
+		while (priority_blocks.size () < blocks)
+		{
+			nano::block_hash hash;
+			if (nano::try_read (priority_stream, hash.bytes))
+			{
+				break;
+			}
+			priority_blocks.push_back (hash);
+		}
+	}
+	return priority_blocks;
 }
 
 nano::inactive_node::inactive_node (boost::filesystem::path const & path_a, nano::node_flags const & node_flags_a) :
