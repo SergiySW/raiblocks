@@ -441,7 +441,7 @@ void nano::active_transactions::add_expired_optimistic_election (nano::election 
 
 unsigned nano::active_transactions::max_optimistic ()
 {
-	return node.ledger.cache.cemented_count < node.ledger.bootstrap_weight_max_blocks ? std::numeric_limits<unsigned>::max () : 50u;
+	return node.ledger.cache.cemented_count < node.ledger.bootstrap_weight_max_blocks ? std::numeric_limits<unsigned>::max () : 500u;
 }
 
 void nano::active_transactions::frontiers_confirmation (nano::unique_lock<nano::mutex> & lock_a)
@@ -449,7 +449,7 @@ void nano::active_transactions::frontiers_confirmation (nano::unique_lock<nano::
 	// Spend some time prioritizing accounts with the most uncemented blocks to reduce voting traffic
 	auto request_interval = std::chrono::milliseconds (node.network_params.network.request_interval_ms);
 	// Spend longer searching ledger accounts when there is a low amount of elections going on
-	auto low_active = roots.size () < 1000;
+	auto low_active = roots.size () < 10000;
 	auto time_to_spend_prioritizing_ledger_accounts = request_interval / (low_active ? 20 : 100);
 	auto time_to_spend_prioritizing_wallet_accounts = request_interval / 250;
 	auto time_to_spend_confirming_pessimistic_accounts = time_to_spend_prioritizing_ledger_accounts;
