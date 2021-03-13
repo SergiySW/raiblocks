@@ -129,7 +129,7 @@ public:
 	static constexpr unsigned bootstrap_max_new_connections = 32;
 	static constexpr size_t bootstrap_max_confirm_frontiers = 70;
 	static constexpr size_t bootstrap_max_bulk_push_targets = 32 * 1024;
-	static constexpr double required_frontier_confirmation_ratio = 0.8;
+	static constexpr double required_frontier_confirmation_ratio = 0.05;
 	static constexpr unsigned frontier_confirmation_blocks_limit = 128 * 1024;
 	static constexpr uint32_t frontier_count_limit = 1024 * 1024;
 	static constexpr unsigned requeued_pulls_limit = 256;

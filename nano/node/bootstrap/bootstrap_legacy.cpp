@@ -299,7 +299,7 @@ bool nano::bootstrap_attempt_legacy::confirm_frontiers (nano::unique_lock<nano::
 				}
 			}
 			auto confirmed_count (frontiers_count - frontiers.size ());
-			if (confirmed_count >= frontiers_count * nano::bootstrap_limits::required_frontier_confirmation_ratio) // 80% of frontiers confirmed
+			if (confirmed_count >= frontiers_count * nano::bootstrap_limits::required_frontier_confirmation_ratio) // 5% of frontiers confirmed
 			{
 				confirmed = true;
 			}
