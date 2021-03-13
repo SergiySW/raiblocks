@@ -271,7 +271,7 @@ bool nano::bootstrap_attempt_legacy::confirm_frontiers (nano::unique_lock<nano::
 					{
 						tally += node->ledger.weight (voter);
 					}
-					if (existing.status.confirmed || (tally > reps_weight / 8 && existing.voters.size () >= representatives.size () * 0.6)) // 12.5% of weight, 60% of reps
+					if (existing.status.confirmed || (tally > reps_weight / 8 && existing.voters.size () >= representatives.size () * 0.2)) // 12.5% of weight, 20% of reps
 					{
 						ii = frontiers.erase (ii);
 					}
