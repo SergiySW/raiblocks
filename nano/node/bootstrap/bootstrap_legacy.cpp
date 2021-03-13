@@ -256,7 +256,7 @@ bool nano::bootstrap_attempt_legacy::confirm_frontiers (nano::unique_lock<nano::
 		{
 			std::unordered_map<std::shared_ptr<nano::transport::channel>, std::deque<std::pair<nano::block_hash, nano::root>>> batched_confirm_req_bundle;
 			std::deque<std::pair<nano::block_hash, nano::root>> request;
-			// Find confirmed frontiers (tally > 12.5% of reps stake, 60% of requestsed reps responded
+			// Find confirmed frontiers (tally > 6.25% of reps stake, 20% of requestsed reps responded
 			for (auto ii (frontiers.begin ()); ii != frontiers.end ();)
 			{
 				if (node->ledger.block_or_pruned_exists (*ii))
@@ -271,7 +271,7 @@ bool nano::bootstrap_attempt_legacy::confirm_frontiers (nano::unique_lock<nano::
 					{
 						tally += node->ledger.weight (voter);
 					}
-					if (existing.status.confirmed || (tally > reps_weight / 8 && existing.voters.size () >= representatives.size () * 0.2)) // 12.5% of weight, 20% of reps
+					if (existing.status.confirmed || (tally > reps_weight / 16 && existing.voters.size () >= representatives.size () * 0.2)) // 6.25% of weight, 20% of reps
 					{
 						ii = frontiers.erase (ii);
 					}
