@@ -441,7 +441,9 @@ void nano::active_transactions::add_expired_optimistic_election (nano::election 
 
 unsigned nano::active_transactions::max_optimistic ()
 {
-	return node.ledger.cache.cemented_count < node.ledger.bootstrap_weight_max_blocks ? std::numeric_limits<unsigned>::max () : 50u;
+	bool const cemented_bootstrap_count_reached = node.ledger.cache.cemented_count >= node.ledger.bootstrap_weight_max_blocks;
+	bool const high_uncemented = (double)node.ledger.cache.cemented_count * 1.01 < (double)node.ledger.cache.block_count;
+	return !cemented_bootstrap_count_reached || high_uncemented ? std::numeric_limits<unsigned>::max () : 50u;
 }
 
 void nano::active_transactions::frontiers_confirmation (nano::unique_lock<nano::mutex> & lock_a)
@@ -450,7 +452,9 @@ void nano::active_transactions::frontiers_confirmation (nano::unique_lock<nano::
 	auto request_interval = std::chrono::milliseconds (node.network_params.network.request_interval_ms);
 	// Spend longer searching ledger accounts when there is a low amount of elections going on
 	auto low_active = roots.size () < 1000;
-	auto time_to_spend_prioritizing_ledger_accounts = request_interval / (low_active ? 20 : 100);
+	// Spend longer searching ledger accounts when node cemented block count is far below total block count
+	bool const high_uncemented = (double)node.ledger.cache.cemented_count * 1.01 < (double)node.ledger.cache.block_count;
+	auto time_to_spend_prioritizing_ledger_accounts = request_interval / (high_uncemented || low_active ? 20 : 100);
 	auto time_to_spend_prioritizing_wallet_accounts = request_interval / 250;
 	auto time_to_spend_confirming_pessimistic_accounts = time_to_spend_prioritizing_ledger_accounts;
 	lock_a.unlock ();
@@ -601,10 +605,12 @@ void nano::active_transactions::request_loop ()
 	}
 }
 
-bool nano::active_transactions::prioritize_account_for_confirmation (nano::active_transactions::prioritize_num_uncemented & cementable_frontiers_a, size_t & cementable_frontiers_size_a, nano::account const & account_a, nano::account_info const & info_a, uint64_t confirmation_height_a)
+bool nano::active_transactions::prioritize_account_for_confirmation (nano::active_transactions::prioritize_num_uncemented & cementable_frontiers_a, size_t & cementable_frontiers_size_a, nano::account const & account_a, nano::account_info const & info_a, uint64_t confirmation_height_a, bool wallet_account_a)
 {
 	auto inserted_new{ false };
-	if (info_a.block_count > confirmation_height_a && !confirmation_height_processor.is_processing_block (info_a.head))
+	// Skip random 1 block accounts (90%)
+	bool const skip_account{ !wallet_account_a && info_a.block_count == 1 && nano::random_pool::generate_byte () < 0xef };
+	if (info_a.block_count > confirmation_height_a && !skip_account && !confirmation_height_processor.is_processing_block (info_a.head))
 	{
 		auto num_uncemented = info_a.block_count - confirmation_height_a;
 		nano::lock_guard<nano::mutex> guard (mutex);
@@ -713,7 +719,7 @@ void nano::active_transactions::prioritize_frontiers_for_confirmation (nano::tra
 								priority_cementable_frontiers_size = priority_cementable_frontiers.size ();
 							}
 
-							auto insert_newed = prioritize_account_for_confirmation (priority_wallet_cementable_frontiers, priority_wallet_cementable_frontiers_size, account, info, confirmation_height_info.height);
+							auto insert_newed = prioritize_account_for_confirmation (priority_wallet_cementable_frontiers, priority_wallet_cementable_frontiers_size, account, info, confirmation_height_info.height, true /* wallet account */);
 							if (insert_newed)
 							{
 								++num_new_inserted;
@@ -756,7 +762,7 @@ void nano::active_transactions::prioritize_frontiers_for_confirmation (nano::tra
 				{
 					nano::confirmation_height_info confirmation_height_info;
 					node.store.confirmation_height_get (transaction_a, account, confirmation_height_info);
-					auto insert_newed = prioritize_account_for_confirmation (priority_cementable_frontiers, priority_cementable_frontiers_size, account, info, confirmation_height_info.height);
+					auto insert_newed = prioritize_account_for_confirmation (priority_cementable_frontiers, priority_cementable_frontiers_size, account, info, confirmation_height_info.height, false /* non-wallet account */);
 					if (insert_newed)
 					{
 						++num_new_inserted;
