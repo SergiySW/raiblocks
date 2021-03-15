@@ -321,16 +321,28 @@ void nano::frontier_req_server::next ()
 	if (accounts.empty ())
 	{
 		auto now (nano::seconds_since_epoch ());
-		bool skip_old (request->age != std::numeric_limits<decltype (request->age)>::max ());
+		bool disable_age_filter (request->age == std::numeric_limits<decltype (request->age)>::max ());
+		uint64_t read_count (0);
 		size_t max_size (128);
 		auto transaction (connection->node->store.tx_begin_read ());
 		for (auto i (connection->node->store.latest_begin (transaction, current.number () + 1)), n (connection->node->store.latest_end ()); i != n && accounts.size () != max_size; ++i)
 		{
+			++read_count;
+			nano::account const & account (i->first);
 			nano::account_info const & info (i->second);
-			if (!skip_old || (now - info.modified) <= request->age)
+			if (send_disconnected_accounts || info.block_count > 1)
 			{
-				nano::account const & account (i->first);
-				accounts.emplace_back (account, info.head);
+				if (disable_age_filter || (now - info.modified) <= request->age)
+				{
+					accounts.emplace_back (account, info.head);
+				}
+			}
+			if (read_count % batch_read_size == 0)
+			{
+				nano::account next_account (account.number () != std::numeric_limits<nano::uint256_t>::max () ? account.number () + 1 : account.number ());
+				transaction.refresh ();
+				i = connection->node->store.accounts_begin (transaction, next_account);
+				n = connection->node->store.accounts_end ();
 			}
 		}
 		/* If loop breaks before max_size, then latest_end () is reached
