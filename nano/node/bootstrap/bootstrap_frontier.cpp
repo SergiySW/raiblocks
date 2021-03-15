@@ -322,6 +322,7 @@ void nano::frontier_req_server::next ()
 	{
 		auto now (nano::seconds_since_epoch ());
 		bool disable_age_filter (request->age == std::numeric_limits<decltype (request->age)>::max ());
+		bool send_disconnected_accounts (connection->node->config.bootstrap_disconnected_accounts_percent > nano::random_pool::generate_word32 (0, 99)); // Randomly send or not 1 block accounts. This accounts cannot affect other accounts in ledger. Configurable
 		uint64_t read_count (0);
 		size_t max_size (128);
 		auto transaction (connection->node->store.tx_begin_read ());
@@ -341,8 +342,8 @@ void nano::frontier_req_server::next ()
 			{
 				nano::account next_account (account.number () != std::numeric_limits<nano::uint256_t>::max () ? account.number () + 1 : account.number ());
 				transaction.refresh ();
-				i = connection->node->store.accounts_begin (transaction, next_account);
-				n = connection->node->store.accounts_end ();
+				i = connection->node->store.latest_begin (transaction, next_account);
+				n = connection->node->store.latest_end ();
 			}
 		}
 		/* If loop breaks before max_size, then latest_end () is reached
