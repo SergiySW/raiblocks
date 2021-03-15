@@ -442,7 +442,7 @@ unsigned nano::active_transactions::max_optimistic ()
 {
 	bool const cemented_bootstrap_count_reached = node.ledger.cache.cemented_count >= node.ledger.bootstrap_weight_max_blocks;
 	bool const high_uncemented = (double)node.ledger.cache.cemented_count * 1.01 < (double)node.ledger.cache.block_count;
-	return !cemented_bootstrap_count_reached || high_uncemented ? std::numeric_limits<unsigned>::max () : 50u;
+	return (!cemented_bootstrap_count_reached || high_uncemented) ? std::numeric_limits<unsigned>::max () : 50u;
 }
 
 void nano::active_transactions::frontiers_confirmation (nano::unique_lock<nano::mutex> & lock_a)
@@ -607,8 +607,8 @@ void nano::active_transactions::request_loop ()
 bool nano::active_transactions::prioritize_account_for_confirmation (nano::active_transactions::prioritize_num_uncemented & cementable_frontiers_a, size_t & cementable_frontiers_size_a, nano::account const & account_a, nano::account_info const & info_a, uint64_t confirmation_height_a, bool wallet_account_a)
 {
 	auto inserted_new{ false };
-	// Skip random 1 block accounts (90%)
-	bool const skip_account{ !wallet_account_a && info_a.block_count == 1 && nano::random_pool::generate_byte () < 0xef };
+	// Skip random 1 block accounts. 90% skip by default. Configurable
+	bool const skip_account{ !wallet_account_a && info_a.block_count == 1 && node.config.active_disconnected_accounts_percent > nano::random_pool::generate_word32 (0, 99) };
 	if (info_a.block_count > confirmation_height_a && !skip_account && !confirmation_height_processor.is_processing_block (info_a.head))
 	{
 		auto num_uncemented = info_a.block_count - confirmation_height_a;
