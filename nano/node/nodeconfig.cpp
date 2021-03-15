@@ -98,6 +98,7 @@ nano::error nano::node_config::serialize_toml (nano::tomlconfig & toml) const
 	toml.put ("use_memory_pools", use_memory_pools, "If true, allocate memory from memory pools. Enabling this may improve performance. Memory is never released to the OS.\ntype:bool");
 	toml.put ("confirmation_history_size", confirmation_history_size, "Maximum confirmation history size. If tracking the rate of block confirmations, the websocket feature is recommended instead.\ntype:uint64");
 	toml.put ("active_elections_size", active_elections_size, "Number of active elections. Elections beyond this limit have limited survival time.\nWarning: modifying this value may result in a lower confirmation rate.\ntype:uint64,[250..]");
+	toml.put ("active_disconnected_accounts_percent", active_disconnected_accounts_percent, "Percentage of disconnected accounts to start frontiers confirmation. Defaults to 10.\ntype:uint32,[0,100]");
 	toml.put ("bandwidth_limit", bandwidth_limit, "Outbound traffic limit in bytes/sec after which messages will be dropped.\nNote: changing to unlimited bandwidth (0) is not recommended for limited connections.\ntype:uint64");
 	toml.put ("bandwidth_limit_burst_ratio", bandwidth_limit_burst_ratio, "Burst ratio for outbound traffic shaping.\ntype:double");
 	toml.put ("conf_height_processor_batch_min_time", conf_height_processor_batch_min_time.count (), "Minimum write batching time when there are blocks pending confirmation height.\ntype:milliseconds");
@@ -351,6 +352,7 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 		toml.get<bool> ("use_memory_pools", use_memory_pools);
 		toml.get<size_t> ("confirmation_history_size", confirmation_history_size);
 		toml.get<size_t> ("active_elections_size", active_elections_size);
+		toml.get<uint32_t> ("active_disconnected_accounts_percent", active_disconnected_accounts_percent);
 		toml.get<size_t> ("bandwidth_limit", bandwidth_limit);
 		toml.get<double> ("bandwidth_limit_burst_ratio", bandwidth_limit_burst_ratio);
 		toml.get<bool> ("backup_before_upgrade", backup_before_upgrade);
@@ -431,6 +433,10 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 		if (block_processor_batch_max_time < network_params.node.process_confirmed_interval)
 		{
 			toml.get_error ().set ((boost::format ("block_processor_batch_max_time value must be equal or larger than %1%ms") % network_params.node.process_confirmed_interval.count ()).str ());
+		}
+		if (active_disconnected_accounts_percent < 0 || active_disconnected_accounts_percent > 100)
+		{
+			toml.get_error ().set ("active_disconnected_accounts_percent must be a number between 0 and 100");
 		}
 	}
 	catch (std::runtime_error const & ex)
