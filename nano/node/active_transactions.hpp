@@ -276,7 +276,7 @@ private:
 	bool skip_wallets{ false };
 	std::atomic<unsigned> optimistic_elections_count{ 0 };
 	void prioritize_frontiers_for_confirmation (nano::transaction const &, std::chrono::milliseconds, std::chrono::milliseconds);
-	bool prioritize_account_for_confirmation (prioritize_num_uncemented &, size_t &, nano::account const &, nano::account_info const &, uint64_t);
+	bool prioritize_account_for_confirmation (prioritize_num_uncemented &, size_t &, nano::account const &, nano::account_info const &, uint64_t, bool);
 	unsigned max_optimistic ();
 	void set_next_frontier_check (bool);
 	void add_expired_optimistic_election (nano::election const &);
