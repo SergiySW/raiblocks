@@ -177,12 +177,12 @@ void nano::rep_crawler::throttled_remove (nano::block_hash const & hash_a, uint6
 {
 	if (node.vote_processor.total_processed >= target_finished_processed)
 	{
-		node.rep_crawler.remove (hash_a);
+		remove (hash_a);
 	}
 	else
 	{
 		std::weak_ptr<nano::node> node_w (node.shared ());
-		node.workers.add_timed_task (std::chrono::steady_clock::now () + std::chrono::seconds (5), [node_w, hash_a, target_finished_processed]() {
+		node.alarm.add (std::chrono::steady_clock::now () + std::chrono::seconds (5), [node_w, hash_a, target_finished_processed]() {
 			if (auto node_l = node_w.lock ())
 			{
 				node_l->rep_crawler.throttled_remove (hash_a, target_finished_processed);
