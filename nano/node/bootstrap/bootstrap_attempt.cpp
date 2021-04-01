@@ -137,6 +137,11 @@ void nano::bootstrap_attempt::add_recent_pull (nano::block_hash const &)
 	debug_assert (mode == nano::bootstrap_mode::legacy);
 }
 
+void nano::bootstrap_attempt::set_start_account (nano::account const &)
+{
+	debug_assert (mode == nano::bootstrap_mode::legacy);
+}
+
 bool nano::bootstrap_attempt::process_block (std::shared_ptr<nano::block> block_a, nano::account const & known_account_a, uint64_t pull_blocks, nano::bulk_pull::count_t max_blocks, bool block_expected, unsigned retry_limit)
 {
 	nano::unchecked_info info (block_a, known_account_a, 0, nano::signature_verification::unknown);
@@ -193,9 +198,10 @@ size_t nano::bootstrap_attempt::wallet_size ()
 	return 0;
 }
 
-nano::bootstrap_attempt_legacy::bootstrap_attempt_legacy (std::shared_ptr<nano::node> node_a, uint64_t incremental_id_a, std::string id_a, uint32_t const frontiers_age_a) :
+nano::bootstrap_attempt_legacy::bootstrap_attempt_legacy (std::shared_ptr<nano::node> node_a, uint64_t incremental_id_a, std::string id_a, uint32_t const frontiers_age_a, nano::account const & start_account_a) :
 nano::bootstrap_attempt (node_a, nano::bootstrap_mode::legacy, incremental_id_a, id_a),
-frontiers_age (frontiers_age_a)
+frontiers_age (frontiers_age_a),
+start_account (start_account_a)
 {
 	node->bootstrap_initiator.notify_listeners (true);
 }
@@ -444,6 +450,14 @@ bool nano::bootstrap_attempt_legacy::confirm_frontiers (nano::unique_lock<std::m
 	return confirmed;
 }
 
+void nano::bootstrap_attempt_legacy::set_start_account (nano::account const & start_account_a)
+{
+	// Add last account fron frontier request
+	nano::lock_guard<nano::mutex> lock (mutex);
+	start_account_previous = start_account;
+	start_account = start_account_a;
+}
+
 bool nano::bootstrap_attempt_legacy::request_frontier (nano::unique_lock<std::mutex> & lock_a, bool first_attempt)
 {
 	auto result (true);
@@ -457,7 +471,7 @@ bool nano::bootstrap_attempt_legacy::request_frontier (nano::unique_lock<std::mu
 		{
 			auto this_l (shared_from_this ());
 			auto client (std::make_shared<nano::frontier_req_client> (connection_l, this_l));
-			client->run (frontiers_age);
+			client->run (start_account, frontiers_age, nano::bootstrap_limits::frontier_count_limit);
 			frontiers = client;
 			future = client->promise.get_future ();
 		}
@@ -511,8 +525,6 @@ void nano::bootstrap_attempt_legacy::run_start (nano::unique_lock<std::mutex> & 
 {
 	frontiers_received = false;
 	frontiers_confirmed = false;
-	total_blocks = 0;
-	requeued_pulls = 0;
 	recent_pulls_head.clear ();
 	auto frontier_failure (true);
 	uint64_t frontier_attempts (0);
@@ -544,7 +556,16 @@ void nano::bootstrap_attempt_legacy::run ()
 		lock.unlock ();
 		node->block_processor.flush ();
 		lock.lock ();
-		node->logger.try_log ("Finished flushing unchecked blocks");
+		if (start_account.number () != std::numeric_limits<nano::uint256_t>::max ())
+		{
+			node->logger.try_log (boost::str (boost::format ("Finished flushing unchecked blocks, requesting new frontiers after %1%") % start_account.to_account ()));
+			// Requesting new frontiers
+			run_start (lock);
+		}
+		else
+		{
+			node->logger.try_log ("Finished flushing unchecked blocks");
+		}
 	}
 	if (!stopped)
 	{
@@ -570,4 +591,5 @@ void nano::bootstrap_attempt_legacy::get_information (boost::property_tree::ptre
 	tree_a.put ("frontiers_received", static_cast<bool> (frontiers_received));
 	tree_a.put ("frontiers_confirmed", static_cast<bool> (frontiers_confirmed));
 	tree_a.put ("frontiers_age", std::to_string (frontiers_age));
+	tree_a.put ("last_account", start_account.to_account ());
 }

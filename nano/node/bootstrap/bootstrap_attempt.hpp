@@ -27,6 +27,7 @@ public:
 	virtual void add_frontier (nano::pull_info const &);
 	virtual void add_bulk_push_target (nano::block_hash const &, nano::block_hash const &);
 	virtual bool request_bulk_push_target (std::pair<nano::block_hash, nano::block_hash> &);
+	virtual void set_start_account (nano::account const &);
 	virtual void add_recent_pull (nano::block_hash const &);
 	virtual void lazy_start (nano::hash_or_account const &, bool confirmed = true);
 	virtual void lazy_add (nano::pull_info const &);
@@ -59,7 +60,7 @@ public:
 class bootstrap_attempt_legacy : public bootstrap_attempt
 {
 public:
-	explicit bootstrap_attempt_legacy (std::shared_ptr<nano::node> node_a, uint64_t incremental_id_a, std::string id_a = "", uint32_t const frontiers_age_a = std::numeric_limits<uint32_t>::max ());
+	explicit bootstrap_attempt_legacy (std::shared_ptr<nano::node> node_a, uint64_t incremental_id_a, std::string id_a, uint32_t const frontiers_age_a, nano::account const & start_account_a);
 	void run () override;
 	bool consume_future (std::future<bool> &);
 	void stop () override;
@@ -69,6 +70,7 @@ public:
 	void add_frontier (nano::pull_info const &) override;
 	void add_bulk_push_target (nano::block_hash const &, nano::block_hash const &) override;
 	bool request_bulk_push_target (std::pair<nano::block_hash, nano::block_hash> &) override;
+	void set_start_account (nano::account const &) override;
 	void add_recent_pull (nano::block_hash const &) override;
 	void run_start (nano::unique_lock<std::mutex> &);
 	bool confirm_frontiers (nano::unique_lock<std::mutex> &);
@@ -79,6 +81,8 @@ public:
 	std::deque<nano::pull_info> frontier_pulls;
 	std::deque<nano::block_hash> recent_pulls_head;
 	std::vector<std::pair<nano::block_hash, nano::block_hash>> bulk_push_targets;
+	nano::account start_account{ 0 };
+	nano::account start_account_previous{ 0 };
 	std::atomic<unsigned> account_count{ 0 };
 	uint32_t frontiers_age;
 };
