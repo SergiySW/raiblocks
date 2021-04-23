@@ -6,9 +6,9 @@
 #include <boost/format.hpp>
 
 nano::bootstrap_attempt_legacy::bootstrap_attempt_legacy (std::shared_ptr<nano::node> const & node_a, uint64_t const incremental_id_a, std::string const & id_a, uint32_t const frontiers_age_a, nano::account const & start_account_a) :
-nano::bootstrap_attempt (node_a, nano::bootstrap_mode::legacy, incremental_id_a, id_a),
-frontiers_age (frontiers_age_a),
-start_account (start_account_a)
+	nano::bootstrap_attempt (node_a, nano::bootstrap_mode::legacy, incremental_id_a, id_a),
+	frontiers_age (frontiers_age_a),
+	start_account (start_account_a)
 {
 	node->bootstrap_initiator.notify_listeners (true);
 }
@@ -120,7 +120,6 @@ void nano::bootstrap_attempt_legacy::set_start_account (nano::account const & st
 {
 	// Add last account fron frontier request
 	nano::lock_guard<nano::mutex> lock (mutex);
-	start_account_previous = start_account;
 	start_account = start_account_a;
 }
 
@@ -137,7 +136,7 @@ bool nano::bootstrap_attempt_legacy::request_frontier (nano::unique_lock<nano::m
 		{
 			auto this_l (shared_from_this ());
 			auto client (std::make_shared<nano::frontier_req_client> (connection_l, this_l));
-			client->run (start_account, frontiers_age, nano::bootstrap_limits::frontier_count_limit);
+			client->run (start_account, frontiers_age, node->config.bootstrap_frontier_request_count);
 			frontiers = client;
 			future = client->promise.get_future ();
 		}

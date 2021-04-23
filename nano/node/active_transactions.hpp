@@ -68,9 +68,9 @@ class inactive_cache_information final
 public:
 	inactive_cache_information () = default;
 	inactive_cache_information (std::chrono::steady_clock::time_point arrival, nano::block_hash hash, nano::account initial_rep_a, uint64_t initial_timestamp_a, nano::inactive_cache_status status) :
-	arrival (arrival),
-	hash (hash),
-	status (status)
+		arrival (arrival),
+		hash (hash),
+		status (status)
 	{
 		voters.reserve (8);
 		voters.emplace_back (initial_rep_a, initial_timestamp_a);
@@ -172,7 +172,7 @@ public:
 	// Returns false if the election difficulty was updated
 	bool update_difficulty (std::shared_ptr<nano::block> const &, bool);
 	// Returns false if the election was restarted
-	bool restart (nano::transaction const &, std::shared_ptr<nano::block> const &);
+	void restart (nano::transaction const &, std::shared_ptr<nano::block> const &);
 	// Returns a list of elections sorted by difficulty
 	std::vector<std::shared_ptr<nano::election>> list_active (size_t = std::numeric_limits<size_t>::max ());
 	double normalized_multiplier (nano::block const &, boost::optional<roots_iterator> const & = boost::none) const;
@@ -190,6 +190,10 @@ public:
 	boost::optional<nano::election_status_type> confirm_block (nano::transaction const &, std::shared_ptr<nano::block> const &);
 	void block_cemented_callback (std::shared_ptr<nano::block> const &);
 	void block_already_cemented_callback (nano::block_hash const &);
+
+	int64_t vacancy () const;
+	std::function<void ()> vacancy_update{ [] () {} };
+
 	boost::optional<double> last_prioritized_multiplier{ boost::none };
 	std::unordered_map<nano::block_hash, std::shared_ptr<nano::election>> blocks;
 	std::deque<nano::election_status> list_recently_cemented ();

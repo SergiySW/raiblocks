@@ -21,14 +21,14 @@ const std::string default_test_peer_network = nano::get_env_or_default ("NANO_TE
 }
 
 nano::node_config::node_config () :
-node_config (0, nano::logging ())
+	node_config (0, nano::logging ())
 {
 }
 
 nano::node_config::node_config (uint16_t peering_port_a, nano::logging const & logging_a) :
-peering_port (peering_port_a),
-logging (logging_a),
-external_address (boost::asio::ip::address_v6{}.to_string ())
+	peering_port (peering_port_a),
+	logging (logging_a),
+	external_address (boost::asio::ip::address_v6{}.to_string ())
 {
 	// The default constructor passes 0 to indicate we should use the default port,
 	// which is determined at node startup based on active network.
@@ -87,7 +87,8 @@ nano::error nano::node_config::serialize_toml (nano::tomlconfig & toml) const
 	toml.put ("bootstrap_connections", bootstrap_connections, "Number of outbound bootstrap connections. Must be a power of 2. Defaults to 4.\nWarning: a larger amount of connections may use substantially more system memory.\ntype:uint64");
 	toml.put ("bootstrap_connections_max", bootstrap_connections_max, "Maximum number of inbound bootstrap connections. Defaults to 64.\nWarning: a larger amount of connections may use additional system memory.\ntype:uint64");
 	toml.put ("bootstrap_initiator_threads", bootstrap_initiator_threads, "Number of threads dedicated to concurrent bootstrap attempts. Defaults to 1.\nWarning: a larger amount of attempts may use additional system memory and disk IO.\ntype:uint64");
-	toml.put ("bootstrap_disconnected_accounts_percent", bootstrap_disconnected_accounts_percent, "Percentage of disconnected accounts to send on frontier request server. Defaults to 10.\ntype:uint32,[0,100]");
+	toml.put ("bootstrap_frontier_request_count", bootstrap_frontier_request_count, "Number frontiers per bootstrap frontier request. Defaults to 1048576.\ntype:uint32,[1024..4294967295]");
+	toml.put ("bootstrap_disconnected_accounts_percent", bootstrap_disconnected_accounts_percent, "Percentage of disconnected accounts to send on frontier request server. Defaults to 10.\ntype:uint8,[0,100]");
 	toml.put ("lmdb_max_dbs", deprecated_lmdb_max_dbs, "DEPRECATED: use node.lmdb.max_databases instead.\nMaximum open lmdb databases. Increase default if more than 100 wallets is required.\nNote: external management is recommended when a large number of wallets is required (see https://docs.nano.org/integration-guides/key-management/).\ntype:uint64");
 	toml.put ("block_processor_batch_max_time", block_processor_batch_max_time.count (), "The maximum time the block processor can continuously process blocks for.\ntype:milliseconds");
 	toml.put ("allow_local_peers", allow_local_peers, "Enable or disable local host peering.\ntype:bool");
@@ -230,7 +231,7 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 		if (toml.has_key ("work_peers"))
 		{
 			work_peers.clear ();
-			toml.array_entries_required<std::string> ("work_peers", [this](std::string const & entry_a) {
+			toml.array_entries_required<std::string> ("work_peers", [this] (std::string const & entry_a) {
 				this->deserialize_address (entry_a, this->work_peers);
 			});
 		}
@@ -238,7 +239,7 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 		if (toml.has_key (preconfigured_peers_key))
 		{
 			preconfigured_peers.clear ();
-			toml.array_entries_required<std::string> (preconfigured_peers_key, [this](std::string entry) {
+			toml.array_entries_required<std::string> (preconfigured_peers_key, [this] (std::string entry) {
 				preconfigured_peers.push_back (entry);
 			});
 		}
@@ -246,7 +247,7 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 		if (toml.has_key ("preconfigured_representatives"))
 		{
 			preconfigured_representatives.clear ();
-			toml.array_entries_required<std::string> ("preconfigured_representatives", [this, &toml](std::string entry) {
+			toml.array_entries_required<std::string> ("preconfigured_representatives", [this, &toml] (std::string entry) {
 				nano::account representative (0);
 				if (representative.decode_account (entry))
 				{
@@ -319,7 +320,8 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 		toml.get<unsigned> ("bootstrap_connections", bootstrap_connections);
 		toml.get<unsigned> ("bootstrap_connections_max", bootstrap_connections_max);
 		toml.get<unsigned> ("bootstrap_initiator_threads", bootstrap_initiator_threads);
-		toml.get<uint32_t> ("bootstrap_disconnected_accounts_percent", bootstrap_disconnected_accounts_percent);
+		toml.get<uint32_t> ("bootstrap_frontier_request_count", bootstrap_frontier_request_count);
+		toml.get<uint8_t> ("bootstrap_disconnected_accounts_percent", bootstrap_disconnected_accounts_percent);
 		toml.get<bool> ("enable_voting", enable_voting);
 		toml.get<bool> ("allow_local_peers", allow_local_peers);
 		toml.get<unsigned> (signature_checker_threads_key, signature_checker_threads);
@@ -389,7 +391,7 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 			if (experimental_config_l.has_key ("secondary_work_peers"))
 			{
 				secondary_work_peers.clear ();
-				experimental_config_l.array_entries_required<std::string> ("secondary_work_peers", [this](std::string const & entry_a) {
+				experimental_config_l.array_entries_required<std::string> ("secondary_work_peers", [this] (std::string const & entry_a) {
 					this->deserialize_address (entry_a, this->secondary_work_peers);
 				});
 			}
@@ -448,6 +450,10 @@ nano::error nano::node_config::deserialize_toml (nano::tomlconfig & toml)
 		if (confirm_req_batches_max < 1 || confirm_req_batches_max > 100)
 		{
 			toml.get_error ().set ("confirm_req_batches_max must be between 1 and 100");
+		}
+		if (bootstrap_frontier_request_count < 1024)
+		{
+			toml.get_error ().set ("bootstrap_frontier_request_count must be greater than or equal to 1024");
 		}
 		if (bootstrap_disconnected_accounts_percent < 0 || bootstrap_disconnected_accounts_percent > 100)
 		{
@@ -585,7 +591,7 @@ nano::error nano::node_config::deserialize_json (bool & upgraded_a, nano::jsonco
 
 		work_peers.clear ();
 		auto work_peers_l (json.get_required_child ("work_peers"));
-		work_peers_l.array_entries<std::string> ([this](std::string entry) {
+		work_peers_l.array_entries<std::string> ([this] (std::string entry) {
 			auto port_position (entry.rfind (':'));
 			bool result = port_position == -1;
 			if (!result)
@@ -603,13 +609,13 @@ nano::error nano::node_config::deserialize_json (bool & upgraded_a, nano::jsonco
 
 		auto preconfigured_peers_l (json.get_required_child (preconfigured_peers_key));
 		preconfigured_peers.clear ();
-		preconfigured_peers_l.array_entries<std::string> ([this](std::string entry) {
+		preconfigured_peers_l.array_entries<std::string> ([this] (std::string entry) {
 			preconfigured_peers.push_back (entry);
 		});
 
 		auto preconfigured_representatives_l (json.get_required_child ("preconfigured_representatives"));
 		preconfigured_representatives.clear ();
-		preconfigured_representatives_l.array_entries<std::string> ([this, &json](std::string entry) {
+		preconfigured_representatives_l.array_entries<std::string> ([this, &json] (std::string entry) {
 			nano::account representative (0);
 			if (representative.decode_account (entry))
 			{
