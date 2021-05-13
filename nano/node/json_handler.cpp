@@ -514,7 +514,7 @@ void nano::json_handler::account_balance ()
 	auto account (account_impl ());
 	if (!ec)
 	{
-		const bool include_only_confirmed = request.get<bool> ("include_only_confirmed", false);
+		const bool include_only_confirmed = request.get<bool> ("include_only_confirmed", true);
 		auto balance (node.balance_pending (account, include_only_confirmed));
 		response_l.put ("balance", balance.first.convert_to<std::string> ());
 		response_l.put ("pending", balance.second.convert_to<std::string> ());
@@ -945,7 +945,7 @@ void nano::json_handler::accounts_pending ()
 	auto threshold (threshold_optional_impl ());
 	const bool source = request.get<bool> ("source", false);
 	const bool include_active = request.get<bool> ("include_active", false);
-	const bool include_only_confirmed = request.get<bool> ("include_only_confirmed", false);
+	const bool include_only_confirmed = request.get<bool> ("include_only_confirmed", true);
 	const bool sorting = request.get<bool> ("sorting", false);
 	auto simple (threshold.is_zero () && !source && !sorting); // if simple, response is a list of hashes for each account
 	boost::property_tree::ptree pending;
@@ -1012,25 +1012,19 @@ void nano::json_handler::accounts_pending ()
 void nano::json_handler::active_difficulty ()
 {
 	auto include_trend (request.get<bool> ("include_trend", false));
-	auto const multiplier_active = node.active.active_multiplier ();
+	auto const multiplier_active = 1.0;
 	auto const default_difficulty (node.default_difficulty (nano::work_version::work_1));
 	auto const default_receive_difficulty (node.default_receive_difficulty (nano::work_version::work_1));
 	auto const receive_current_denormalized (nano::denormalized_multiplier (multiplier_active, node.network_params.network.publish_thresholds.epoch_2_receive));
+	response_l.put ("deprecated", "1");
 	response_l.put ("network_minimum", nano::to_string_hex (default_difficulty));
 	response_l.put ("network_receive_minimum", nano::to_string_hex (default_receive_difficulty));
 	response_l.put ("network_current", nano::to_string_hex (nano::difficulty::from_multiplier (multiplier_active, default_difficulty)));
 	response_l.put ("network_receive_current", nano::to_string_hex (nano::difficulty::from_multiplier (receive_current_denormalized, default_receive_difficulty)));
-	response_l.put ("multiplier", multiplier_active);
+	response_l.put ("multiplier", 1.0);
 	if (include_trend)
 	{
 		boost::property_tree::ptree trend_entry_l;
-		auto trend_l (node.active.difficulty_trend ());
-		for (auto multiplier_l : trend_l)
-		{
-			boost::property_tree::ptree entry;
-			entry.put ("", nano::to_string (multiplier_l));
-			trend_entry_l.push_back (std::make_pair ("", entry));
-		}
 		response_l.add_child ("difficulty_trend", trend_entry_l);
 	}
 	response_errors ();
@@ -1118,7 +1112,7 @@ void nano::json_handler::block_confirm ()
 			else
 			{
 				// Add record in confirmation history for confirmed block
-				nano::election_status status{ block_l, 0, std::chrono::duration_cast<std::chrono::milliseconds> (std::chrono::system_clock::now ().time_since_epoch ()), std::chrono::duration_values<std::chrono::milliseconds>::zero (), 0, 1, 0, nano::election_status_type::active_confirmation_height };
+				nano::election_status status{ block_l, 0, 0, std::chrono::duration_cast<std::chrono::milliseconds> (std::chrono::system_clock::now ().time_since_epoch ()), std::chrono::duration_values<std::chrono::milliseconds>::zero (), 0, 1, 0, nano::election_status_type::active_confirmation_height };
 				node.active.add_recently_cemented (status);
 				// Trigger callback for confirmed block
 				node.block_arrival.add (hash);
@@ -1748,9 +1742,12 @@ void nano::json_handler::bootstrap_lazy ()
 	{
 		if (!node.flags.disable_lazy_bootstrap)
 		{
+			auto existed (node.bootstrap_initiator.current_lazy_attempt () != nullptr);
 			std::string bootstrap_id (request.get<std::string> ("id", ""));
-			node.bootstrap_initiator.bootstrap_lazy (hash, force, true, bootstrap_id);
-			response_l.put ("started", "1");
+			auto key_inserted (node.bootstrap_initiator.bootstrap_lazy (hash, force, true, bootstrap_id));
+			bool started = !existed && key_inserted;
+			response_l.put ("started", started ? "1" : "0");
+			response_l.put ("key_inserted", key_inserted ? "1" : "0");
 		}
 		else
 		{
@@ -1907,6 +1904,7 @@ void nano::json_handler::confirmation_history ()
 				election.put ("duration", status.election_duration.count ());
 				election.put ("time", status.election_end.count ());
 				election.put ("tally", status.tally.to_string_dec ());
+				election.add ("final", status.final_tally.to_string_dec ());
 				election.put ("blocks", std::to_string (status.block_count));
 				election.put ("voters", std::to_string (status.voter_count));
 				election.put ("request_count", std::to_string (status.confirmation_request_count));
@@ -1984,6 +1982,7 @@ void nano::json_handler::confirmation_info ()
 				blocks.add_child ((block->hash ()).to_string (), entry);
 			}
 			response_l.put ("total_tally", total.convert_to<std::string> ());
+			response_l.put ("final_tally", info.status.final_tally.to_string_dec ());
 			response_l.add_child ("blocks", blocks);
 		}
 		else
@@ -2861,7 +2860,7 @@ void nano::json_handler::pending ()
 	const bool source = request.get<bool> ("source", false);
 	const bool min_version = request.get<bool> ("min_version", false);
 	const bool include_active = request.get<bool> ("include_active", false);
-	const bool include_only_confirmed = request.get<bool> ("include_only_confirmed", false);
+	const bool include_only_confirmed = request.get<bool> ("include_only_confirmed", true);
 	const bool sorting = request.get<bool> ("sorting", false);
 	auto simple (threshold.is_zero () && !source && !min_version && !sorting); // if simple, response is a list of hashes
 	const bool should_sort = sorting && !simple;
@@ -2960,7 +2959,7 @@ void nano::json_handler::pending_exists ()
 {
 	auto hash (hash_impl ());
 	const bool include_active = request.get<bool> ("include_active", false);
-	const bool include_only_confirmed = request.get<bool> ("include_only_confirmed", false);
+	const bool include_only_confirmed = request.get<bool> ("include_only_confirmed", true);
 	if (!ec)
 	{
 		auto transaction (node.store.tx_begin_read ());
@@ -2987,7 +2986,6 @@ void nano::json_handler::pending_exists ()
 void nano::json_handler::process ()
 {
 	node.workers.push_task (create_worker_task ([] (std::shared_ptr<nano::json_handler> const & rpc_l) {
-		const bool watch_work_l = rpc_l->request.get<bool> ("watch_work", true);
 		const bool is_async = rpc_l->request.get<bool> ("async", false);
 		auto block (rpc_l->block_impl (true));
 
@@ -3064,7 +3062,7 @@ void nano::json_handler::process ()
 			{
 				if (!is_async)
 				{
-					auto result (rpc_l->node.process_local (block, watch_work_l));
+					auto result (rpc_l->node.process_local (block));
 					switch (result.code)
 					{
 						case nano::process_result::progress:
@@ -3149,7 +3147,7 @@ void nano::json_handler::process ()
 				{
 					if (block->type () == nano::block_type::state)
 					{
-						rpc_l->node.process_local_async (block, watch_work_l);
+						rpc_l->node.process_local_async (block);
 						rpc_l->response_l.put ("started", "1");
 					}
 					else
@@ -3790,7 +3788,7 @@ void nano::json_handler::telemetry ()
 					if (address.is_loopback () && port == rpc_l->node.network.endpoint ().port ())
 					{
 						// Requesting telemetry metrics locally
-						auto telemetry_data = nano::local_telemetry_data (rpc_l->node.ledger, rpc_l->node.network, rpc_l->node.config.bandwidth_limit, rpc_l->node.network_params, rpc_l->node.startup_time, rpc_l->node.active.active_difficulty (), rpc_l->node.node_id);
+						auto telemetry_data = nano::local_telemetry_data (rpc_l->node.ledger, rpc_l->node.network, rpc_l->node.config.bandwidth_limit, rpc_l->node.network_params, rpc_l->node.startup_time, rpc_l->node.default_difficulty (nano::work_version::work_1), rpc_l->node.node_id);
 
 						nano::jsonconfig config_l;
 						auto const should_ignore_identification_metrics = false;
@@ -4566,7 +4564,7 @@ void nano::json_handler::wallet_pending ()
 	const bool source = request.get<bool> ("source", false);
 	const bool min_version = request.get<bool> ("min_version", false);
 	const bool include_active = request.get<bool> ("include_active", false);
-	const bool include_only_confirmed = request.get<bool> ("include_only_confirmed", false);
+	const bool include_only_confirmed = request.get<bool> ("include_only_confirmed", true);
 	if (!ec)
 	{
 		boost::property_tree::ptree pending;
