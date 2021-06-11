@@ -3331,7 +3331,7 @@ TEST (node, block_processor_signatures)
 	// Invalid signature to unchecked
 	{
 		auto transaction (node1.store.tx_begin_write ());
-		node1.store.unchecked_put (transaction, send5->previous (), send5);
+		node1.store.unchecked.put (transaction, send5->previous (), send5);
 	}
 	auto receive1 = builder.make_block ()
 					.account (key1.pub)
@@ -3577,10 +3577,10 @@ TEST (node, peers)
 	{
 		// Add a peer to the database
 		auto transaction (store.tx_begin_write ());
-		store.peer_put (transaction, endpoint_key);
+		store.peer.put (transaction, endpoint_key);
 
 		// Add a peer which is not contactable
-		store.peer_put (transaction, nano::endpoint_key{ boost::asio::ip::address_v6::any ().to_bytes (), 55555 });
+		store.peer.put (transaction, nano::endpoint_key{ boost::asio::ip::address_v6::any ().to_bytes (), 55555 });
 	}
 
 	node2->start ();
@@ -3605,8 +3605,8 @@ TEST (node, peers)
 
 	// Uncontactable peer should not be stored
 	auto transaction (store.tx_begin_read ());
-	ASSERT_EQ (store.peer_count (transaction), 1);
-	ASSERT_TRUE (store.peer_exists (transaction, endpoint_key));
+	ASSERT_EQ (store.peer.count (transaction), 1);
+	ASSERT_TRUE (store.peer.exists (transaction, endpoint_key));
 
 	node2->stop ();
 }
@@ -3626,7 +3626,7 @@ TEST (node, peer_cache_restart)
 		{
 			// Add a peer to the database
 			auto transaction (store.tx_begin_write ());
-			store.peer_put (transaction, endpoint_key);
+			store.peer.put (transaction, endpoint_key);
 		}
 		node2->start ();
 		ASSERT_TIMELY (10s, !node2->network.empty ());
@@ -3649,8 +3649,8 @@ TEST (node, peer_cache_restart)
 		auto & store = node3->store;
 		{
 			auto transaction (store.tx_begin_read ());
-			ASSERT_EQ (store.peer_count (transaction), 1);
-			ASSERT_TRUE (store.peer_exists (transaction, endpoint_key));
+			ASSERT_EQ (store.peer.count (transaction), 1);
+			ASSERT_TRUE (store.peer.exists (transaction, endpoint_key));
 		}
 		ASSERT_TIMELY (10s, !node3->network.empty ());
 		// Confirm that the peers match with the endpoints we are expecting
@@ -3690,27 +3690,27 @@ TEST (node, unchecked_cleanup)
 	node.config.unchecked_cutoff_time = std::chrono::seconds (2);
 	{
 		auto transaction (node.store.tx_begin_read ());
-		auto unchecked_count (node.store.unchecked_count (transaction));
+		auto unchecked_count (node.store.unchecked.count (transaction));
 		ASSERT_EQ (unchecked_count, 1);
-		ASSERT_EQ (unchecked_count, node.store.unchecked_count (transaction));
+		ASSERT_EQ (unchecked_count, node.store.unchecked.count (transaction));
 	}
 	std::this_thread::sleep_for (std::chrono::seconds (1));
 	node.unchecked_cleanup ();
 	ASSERT_TRUE (node.network.publish_filter.apply (bytes.data (), bytes.size ()));
 	{
 		auto transaction (node.store.tx_begin_read ());
-		auto unchecked_count (node.store.unchecked_count (transaction));
+		auto unchecked_count (node.store.unchecked.count (transaction));
 		ASSERT_EQ (unchecked_count, 1);
-		ASSERT_EQ (unchecked_count, node.store.unchecked_count (transaction));
+		ASSERT_EQ (unchecked_count, node.store.unchecked.count (transaction));
 	}
 	std::this_thread::sleep_for (std::chrono::seconds (2));
 	node.unchecked_cleanup ();
 	ASSERT_FALSE (node.network.publish_filter.apply (bytes.data (), bytes.size ()));
 	{
 		auto transaction (node.store.tx_begin_read ());
-		auto unchecked_count (node.store.unchecked_count (transaction));
+		auto unchecked_count (node.store.unchecked.count (transaction));
 		ASSERT_EQ (unchecked_count, 0);
-		ASSERT_EQ (unchecked_count, node.store.unchecked_count (transaction));
+		ASSERT_EQ (unchecked_count, node.store.unchecked.count (transaction));
 	}
 }
 
