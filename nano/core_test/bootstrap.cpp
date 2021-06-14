@@ -1,6 +1,6 @@
 #include <nano/node/bootstrap/bootstrap_frontier.hpp>
 #include <nano/node/bootstrap/bootstrap_lazy.hpp>
-#include <nano/node/testing.hpp>
+#include <nano/test_common/system.hpp>
 #include <nano/test_common/testutil.hpp>
 
 #include <gtest/gtest.h>
@@ -404,13 +404,13 @@ TEST (bootstrap_processor, pull_disconnected_acount_config)
 	node1->bootstrap_initiator.bootstrap (node0->network.endpoint (), false);
 	// Node1 cannot receive open block because account has only 1 block
 	ASSERT_TIMELY (15s, !node1->bootstrap_initiator.in_progress ());
-	ASSERT_TRUE (node1->store.block_exists (node1->store.tx_begin_read (), send1->hash ()));
-	ASSERT_FALSE (node1->store.block_exists (node1->store.tx_begin_read (), open->hash ()));
+	ASSERT_TRUE (node1->store.block.exists (node1->store.tx_begin_read (), send1->hash ()));
+	ASSERT_FALSE (node1->store.block.exists (node1->store.tx_begin_read (), open->hash ()));
 	// Crearte second block
 	auto send2 (std::make_shared<nano::send_block> (open->hash (), nano::dev_genesis_key.pub, std::numeric_limits<nano::uint128_t>::max () - 100, key.prv, key.pub, *system.work.generate (open->hash ())));
 	ASSERT_EQ (nano::process_result::progress, node0->process (*send2).code);
 	node1->bootstrap_initiator.bootstrap (node0->network.endpoint (), false);
-	ASSERT_TIMELY (10s, node1->store.block_exists (node1->store.tx_begin_read (), send2->hash ()));
+	ASSERT_TIMELY (10s, node1->store.block.exists (node1->store.tx_begin_read (), send2->hash ()));
 	node1->stop ();
 }
 
@@ -470,13 +470,13 @@ TEST (bootstrap_processor, DISABLED_push_diamond_pruning)
 		auto transaction (node1->store.tx_begin_write ());
 		ASSERT_EQ (1, node1->ledger.pruning_action (transaction, send1->hash (), 2));
 		ASSERT_EQ (1, node1->ledger.pruning_action (transaction, open->hash (), 1));
-		ASSERT_TRUE (node1->store.block_exists (transaction, latest));
-		ASSERT_FALSE (node1->store.block_exists (transaction, send1->hash ()));
+		ASSERT_TRUE (node1->store.block.exists (transaction, latest));
+		ASSERT_FALSE (node1->store.block.exists (transaction, send1->hash ()));
 		ASSERT_TRUE (node1->store.pruned.exists (transaction, send1->hash ()));
-		ASSERT_FALSE (node1->store.block_exists (transaction, open->hash ()));
+		ASSERT_FALSE (node1->store.block.exists (transaction, open->hash ()));
 		ASSERT_TRUE (node1->store.pruned.exists (transaction, open->hash ()));
-		ASSERT_TRUE (node1->store.block_exists (transaction, send2->hash ()));
-		ASSERT_TRUE (node1->store.block_exists (transaction, receive->hash ()));
+		ASSERT_TRUE (node1->store.block.exists (transaction, send2->hash ()));
+		ASSERT_TRUE (node1->store.block.exists (transaction, receive->hash ()));
 		ASSERT_EQ (2, node1->ledger.cache.pruned_count);
 		ASSERT_EQ (5, node1->ledger.cache.block_count);
 	}
